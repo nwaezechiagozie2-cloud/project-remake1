@@ -1,0 +1,121 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Loader2 } from "lucide-react";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001"}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || "Login failed");
+      }
+      const { token, vendor_id } = await res.json();
+      localStorage.setItem("otc_token", token);
+      localStorage.setItem("otc_vendor_id", String(vendor_id));
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col items-center pt-[15vh] px-6 selection:bg-[#059669]/10 selection:text-[#059669]">
+      <div className="w-full max-w-[340px]">
+        
+        {/* Logo Mark */}
+        <Link href="/" className="inline-flex items-center gap-2.5 mb-14 group">
+          <div className="w-8 h-8 bg-[#059669] rounded-xl flex items-center justify-center font-black text-white text-sm shadow-[0_4px_12px_rgba(9,9,11,0.3)] transition-transform group-hover:scale-105">
+            O
+          </div>
+          <span className="font-bold text-[17px] text-gray-900 tracking-tight">OmniClose</span>
+        </Link>
+
+        {/* Header */}
+        <div className="mb-10">
+          <h1 className="text-[24px] font-bold tracking-[-0.03em] text-gray-900 leading-tight mb-1.5">Welcome back</h1>
+          <p className="text-[13px] text-gray-500 font-medium">Log in to your vendor dashboard</p>
+        </div>
+
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">
+              Email address
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="name@company.com"
+              className="w-full bg-gray-50/50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#059669]/30 focus:bg-white focus:border-[#059669]/40 transition-all placeholder:text-gray-300"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">
+                Password
+              </label>
+              <button type="button" className="text-[11px] font-bold text-gray-400 hover:text-[#09090b] transition-colors uppercase tracking-[0.1em]">
+                Forgot?
+              </button>
+            </div>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-gray-50/50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#059669]/30 focus:bg-white focus:border-[#059669]/40 transition-all placeholder:text-gray-300"
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 rounded-xl border border-red-100">
+               <p className="text-[12px] text-red-600 font-bold">{error}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#059669] text-white font-bold text-[14px] py-3 rounded-xl transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#047857]"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : "Sign in"}
+            {!loading && <ArrowRight size={16} />}
+          </button>
+        </form>
+
+        {/* Footer Link */}
+        <div className="mt-12 pt-8 border-t border-gray-50 text-center">
+          <p className="text-[13px] text-gray-500 font-medium">
+            Don&apos;t have an account?{" "}
+            <Link href="/register" className="text-gray-900 font-bold hover:underline">
+              Create one for free
+            </Link>
+          </p>
+        </div>
+
+      </div>
+    </div>
+  );
+}

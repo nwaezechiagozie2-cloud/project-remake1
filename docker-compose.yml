@@ -1,0 +1,51 @@
+services:
+  api:
+    build: .
+    container_name: one_tap_closer_api
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - APP_ENV=development
+      - DATABASE_URL=mysql+aiomysql://root:password@db:3306/one_tap_closer
+      - REDIS_URL=redis://redis:6379/0
+      # Provide keys in .env
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    container_name: one_tap_closer_db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=one_tap_closer
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: one_tap_closer_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data:
