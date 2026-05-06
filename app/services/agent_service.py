@@ -5,6 +5,7 @@ Customer messages → AI agent with tools (decides autonomously)
 Vendor button taps → Structured handler (system-level, not AI)
 """
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from app.config import Settings
 from app.domain.interfaces import KnowledgeRepository, ProductRepository, VendorSettingsRepository, CustomerRepository
 from app.domain.models import AgentDecision, ParsedInboundMessage
