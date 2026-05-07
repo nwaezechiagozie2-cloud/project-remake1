@@ -13,7 +13,7 @@ export default function SettingsPage() {
 
   const handleGoogleConnect = () => {
     // Navigate to the backend google auth flow
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001"}/auth/google?vendor_id=${localStorage.getItem("otc_vendor_id")}`;
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/google?vendor_id=${localStorage.getItem("otc_vendor_id")}`;
   };
 
   return (

@@ -4,7 +4,7 @@ import httpx
 
 
 def main() -> None:
-    url = "http://127.0.0.1:8001/health"
+    url = "http://127.0.0.1:8000/health"
     response = httpx.get(url, timeout=5)
     response.raise_for_status()
     print(json.dumps(response.json(), indent=2))

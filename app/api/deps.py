@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from app.config import get_settings
 from app.repositories.sql import (
+    SQLBusinessInfoRepository,
     SQLCustomerRepository,
     SQLGoogleTokenRepository,
     SQLKnowledgeRepository,
@@ -43,6 +44,11 @@ def get_knowledge_repo() -> SQLKnowledgeRepository:
 
 
 @lru_cache(maxsize=1)
+def get_business_info_repo() -> SQLBusinessInfoRepository:
+    return SQLBusinessInfoRepository()
+
+
+@lru_cache(maxsize=1)
 def get_google_token_repo() -> SQLGoogleTokenRepository:
     return SQLGoogleTokenRepository()
 
@@ -56,6 +62,7 @@ def get_agent_service() -> AgentService:
         settings=get_settings(),
         products=get_product_repo(),
         knowledge=get_knowledge_repo(),
+        business_info=get_business_info_repo(),
         customers=get_customer_repo(),
         vendor_settings=get_settings_repo(),
     )

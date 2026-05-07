@@ -30,14 +30,13 @@ class Settings(BaseSettings):
     mysql_user: str = Field(default="vscode", alias="MYSQL_USER")
     mysql_password: str = Field(default="", alias="MYSQL_PASSWORD")
     mysql_database: str = Field(default="one_tap_closer", alias="MYSQL_DATABASE")
+    
+    db_url: str | None = Field(default=None, alias="DATABASE_URL")
 
     @property
     def database_url(self) -> str:
-        # Check if an explicit DATABASE_URL is set in the environment (like in docker modes)
-        # Otherwise, dynamically formulate it using the provided MYSQL variables.
-        # But wait, Pydantic fields can't read `os.environ` easily here if we want dynamic property.
-        if os.environ.get("DATABASE_URL"):
-            return os.environ.get("DATABASE_URL")
+        if self.db_url:
+            return self.db_url
         return f"mysql+aiomysql://{self.mysql_user}:{self.mysql_password}@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
 
     whatsapp_verify_token: str = Field(default="", alias="WHATSAPP_VERIFY_TOKEN")

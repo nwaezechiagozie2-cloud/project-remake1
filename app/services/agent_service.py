@@ -7,7 +7,7 @@ Vendor button taps → Structured handler (system-level, not AI)
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from app.config import Settings
-from app.domain.interfaces import KnowledgeRepository, ProductRepository, VendorSettingsRepository, CustomerRepository
+from app.domain.interfaces import BusinessInfoRepository, KnowledgeRepository, ProductRepository, VendorSettingsRepository, CustomerRepository
 from app.domain.models import AgentDecision, ParsedInboundMessage
 from app.agent.agent import create_customer_agent, run_customer_agent
 
@@ -18,12 +18,14 @@ class AgentService:
         settings: Settings,
         products: ProductRepository,
         knowledge: KnowledgeRepository,
+        business_info: BusinessInfoRepository,
         customers: CustomerRepository,
         vendor_settings: VendorSettingsRepository,
     ) -> None:
         self._settings = settings
         self._products = products
         self._knowledge = knowledge
+        self._business_info = business_info
         self._customers = customers
         self._vendor_settings = vendor_settings
         self._checkpointer = None
@@ -66,6 +68,7 @@ class AgentService:
                 settings=self._settings,
                 products_repo=self._products,
                 knowledge_repo=self._knowledge,
+                business_info_repo=self._business_info,
                 vendor_id=vendor["id"],
                 vendor_dict=vendor,
                 vendor_settings=vendor_settings,
@@ -87,6 +90,7 @@ class AgentService:
                 thread_id=thread_id,
                 products_repo=self._products,
                 knowledge_repo=self._knowledge,
+                business_info_repo=self._business_info,
                 vendor_dict=vendor,
                 vendor_settings=vendor_settings,
                 settings=self._settings,

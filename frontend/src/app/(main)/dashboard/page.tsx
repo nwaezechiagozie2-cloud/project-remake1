@@ -1,6 +1,8 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { TrendingUp, AlertCircle, CheckCircle, ArrowUpRight } from "lucide-react";
+import { TrendingUp, AlertCircle, CheckCircle, ArrowUpRight, Loader2 } from "lucide-react";
+import { fetchDashboardData } from "@/lib/api";
 
 const orders = [
   { id: "#10403", name: "Sarah Jenkins",  product: "Retro Analog Clock",    amount: "₦14,500", status: "paid",    time: "2m ago"  },
@@ -28,27 +30,70 @@ function Avatar({ name }: { name: string }) {
 }
 
 export default function DashboardPage() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const vendorId = localStorage.getItem("otc_vendor_id");
+        const token = localStorage.getItem("otc_token");
+        if (!vendorId || !token) {
+          throw new Error("Missing authentication credentials");
+        }
+        const dashboardData = await fetchDashboardData(vendorId, token);
+        setData(dashboardData);
+      } catch (err: any) {
+        setError(err.message || "Failed to load dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="animate-spin text-gray-400" size={32} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-red-500 font-bold">{error}</p>
+      </div>
+    );
+  }
+
+  const isWhatsAppConnected = Boolean(data?.vendor?.whatsapp_number);
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-[780px] px-8 pt-10 pb-16 mx-auto">
 
         {/* Setup Prompt Banner — visible only when WhatsApp is not connected */}
-        <div className="mb-10 bg-white border border-emerald-700/20 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="space-y-1">
-             <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-700"></span>
-                <p className="text-[13px] font-bold text-gray-900">WhatsApp setup required</p>
-             </div>
-             <p className="text-[12px] text-gray-500 font-medium max-w-md leading-relaxed">
-               You haven&apos;t connected your WhatsApp Business account yet. Connect now to start receiving inquiries and orders.
-             </p>
+        {!isWhatsAppConnected && (
+          <div className="mb-10 bg-white border border-emerald-700/20 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+               <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-700"></span>
+                  <p className="text-[13px] font-bold text-gray-900">WhatsApp setup required</p>
+               </div>
+               <p className="text-[12px] text-gray-500 font-medium max-w-md leading-relaxed">
+                 You haven&apos;t connected your WhatsApp Business account yet. Connect now to start receiving inquiries and orders.
+               </p>
+            </div>
+            <Link href="/settings">
+              <button className="bg-gray-900 text-white px-5 py-2 rounded-xl text-[12px] font-bold hover:bg-black transition-colors shadow-sm shrink-0">
+                 Connect WhatsApp
+              </button>
+            </Link>
           </div>
-          <Link href="/settings">
-            <button className="bg-gray-900 text-white px-5 py-2 rounded-xl text-[12px] font-bold hover:bg-black transition-colors shadow-sm shrink-0">
-               Connect WhatsApp
-            </button>
-          </Link>
-        </div>
+        )}
 
         {/* Page title */}
         <div className="flex items-start justify-between mb-10">
@@ -168,11 +213,13 @@ export default function DashboardPage() {
         <div className="mt-10 pt-6 border-t border-gray-100">
           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em] mb-3">AI Insight</p>
           <p className="text-[13px] font-semibold text-gray-800 leading-relaxed max-w-lg">
-            The bot deflected <span className="text-[#09090b]">45%</span> of all inquiries this week without human input. Consider adding answers on <span className="text-gray-900">shipping timelines</span> to improve deflection further.
+            The bot currently manages <span className="text-[#09090b]">{data?.products?.length || 0} products</span> and <span className="text-[#09090b]">{data?.knowledge_entries?.length || 0} FAQs</span>. Consider adding answers on <span className="text-gray-900">shipping timelines</span> to improve deflection further.
           </p>
-          <button className="mt-3 text-[12px] font-bold text-[#09090b] hover:underline flex items-center gap-1">
-            Edit knowledge base <ArrowUpRight size={12} />
-          </button>
+          <Link href="/knowledge">
+            <button className="mt-3 text-[12px] font-bold text-[#09090b] hover:underline flex items-center gap-1">
+              Edit knowledge base <ArrowUpRight size={12} />
+            </button>
+          </Link>
         </div>
 
       </div>

@@ -54,6 +54,17 @@ class VendorKnowledgeEntry(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
 
 
+class VendorBusinessInfo(Base):
+    __tablename__ = "vendor_business_info"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_type: Mapped[str] = mapped_column(String(50), server_default=text("'TEXT'"))  # TEXT, PDF
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class Product(Base):
     __tablename__ = "products"
 

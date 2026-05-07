@@ -9,6 +9,7 @@ from app.repositories.models import (
     Product,
     Vendor,
     VendorBotSetting,
+    VendorBusinessInfo,
     VendorCustomer,
     VendorGoogleToken,
     VendorKnowledgeEntry,
@@ -384,6 +385,77 @@ class SQLKnowledgeRepository:
                 for row in rows
             ]
 
+    async def get_for_vendor(self, vendor_id: int, entry_id: int) -> dict | None:
+        async with get_session() as session:
+            row = (await session.execute(
+                select(VendorKnowledgeEntry).where(
+                    VendorKnowledgeEntry.vendor_id == vendor_id,
+                    VendorKnowledgeEntry.id == entry_id,
+                )
+            )).scalar_one_or_none()
+            if not row:
+                return None
+            return {
+                "id": row.id,
+                "entry_type": row.entry_type,
+                "title": row.title,
+                "question": row.question,
+                "answer": row.answer,
+                "keywords": row.keywords,
+                "is_active": bool(row.is_active),
+            }
+
+    async def create_for_vendor(self, vendor_id: int, payload: dict) -> dict:
+        async with get_session() as session:
+            row = VendorKnowledgeEntry(vendor_id=vendor_id, **payload)
+            session.add(row)
+            await session.flush()
+            return {
+                "id": row.id,
+                "entry_type": row.entry_type,
+                "title": row.title,
+                "question": row.question,
+                "answer": row.answer,
+                "keywords": row.keywords,
+                "is_active": bool(row.is_active),
+            }
+
+    async def update_for_vendor(self, vendor_id: int, entry_id: int, payload: dict) -> dict | None:
+        async with get_session() as session:
+            row = (await session.execute(
+                select(VendorKnowledgeEntry).where(
+                    VendorKnowledgeEntry.vendor_id == vendor_id,
+                    VendorKnowledgeEntry.id == entry_id,
+                )
+            )).scalar_one_or_none()
+            if not row:
+                return None
+            for key, value in payload.items():
+                setattr(row, key, value)
+            await session.flush()
+            return {
+                "id": row.id,
+                "entry_type": row.entry_type,
+                "title": row.title,
+                "question": row.question,
+                "answer": row.answer,
+                "keywords": row.keywords,
+                "is_active": bool(row.is_active),
+            }
+
+    async def delete_for_vendor(self, vendor_id: int, entry_id: int) -> bool:
+        async with get_session() as session:
+            row = (await session.execute(
+                select(VendorKnowledgeEntry).where(
+                    VendorKnowledgeEntry.vendor_id == vendor_id,
+                    VendorKnowledgeEntry.id == entry_id,
+                )
+            )).scalar_one_or_none()
+            if not row:
+                return False
+            await session.delete(row)
+            return True
+
     async def search(self, vendor_id: int, query: str, allowed_types: list[str] | None = None) -> dict | None:
         normalized = query.strip().lower()
         if not normalized:
@@ -436,3 +508,68 @@ class SQLGoogleTokenRepository:
             else:
                 session.add(VendorGoogleToken(vendor_id=vendor_id, token_json=token_json))
             await session.flush()
+
+
+class SQLBusinessInfoRepository:
+    async def list_for_vendor(self, vendor_id: int) -> list[dict]:
+        async with get_session() as session:
+            rows = (await session.execute(
+                select(VendorBusinessInfo).where(VendorBusinessInfo.vendor_id == vendor_id)
+            )).scalars().all()
+            return [
+                {
+                    "id": row.id,
+                    "title": row.title,
+                    "content": row.content,
+                    "source_type": row.source_type,
+                    "updated_at": row.updated_at,
+                }
+                for row in rows
+            ]
+
+    async def create_for_vendor(self, vendor_id: int, payload: dict) -> dict:
+        async with get_session() as session:
+            row = VendorBusinessInfo(vendor_id=vendor_id, **payload)
+            session.add(row)
+            await session.flush()
+            return {
+                "id": row.id,
+                "title": row.title,
+                "content": row.content,
+                "source_type": row.source_type,
+                "updated_at": row.updated_at,
+            }
+
+    async def delete_for_vendor(self, vendor_id: int, info_id: int) -> bool:
+        async with get_session() as session:
+            row = (await session.execute(
+                select(VendorBusinessInfo).where(
+                    VendorBusinessInfo.vendor_id == vendor_id,
+                    VendorBusinessInfo.id == info_id,
+                )
+            )).scalar_one_or_none()
+            if not row:
+                return False
+            await session.delete(row)
+            return True
+
+    async def search(self, vendor_id: int, query: str) -> str | None:
+        """Simple keyword search across business info content."""
+        async with get_session() as session:
+            normalized = query.strip().lower()
+            if not normalized:
+                return None
+            
+            term = f"%{normalized}%"
+            row = (await session.execute(
+                select(VendorBusinessInfo)
+                .where(VendorBusinessInfo.vendor_id == vendor_id)
+                .where(or_(
+                    VendorBusinessInfo.title.ilike(term),
+                    VendorBusinessInfo.content.ilike(term)
+                ))
+                .limit(1)
+            )).scalar_one_or_none()
+            
+            return row.content if row else None
+

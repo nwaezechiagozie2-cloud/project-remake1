@@ -30,7 +30,7 @@ SYSTEM_PROMPT = (
     "- Prioritize clarity and correctness over cleverness.\n\n"
     "Operational Rules:\n"
     "- If a product is missing, say 'We don't have it'.\n"
-    "- Use search_products for items and search_knowledge_base for store policies.\n"
+    "- Use search_products for items and search_business_info for store policies, delivery info, location, and other business details.\n"
     "- CRITICAL FORBIDDEN ACTION: Never call the request_bank_details_and_vendor_approval tool just because a customer says they 'want' to buy, are 'interested', or 'will take' a product. These are still inquiries.\n"
     "- ONLY CALL request_bank_details_and_vendor_approval when the customer explicitly asks 'How do I pay?', 'What is your account number?', or says 'I am ready to transfer the money now'.\n"
     "- If they just say they want to buy, provide product info and ask: 'Do you want to pay so I can send the details?'\n"
@@ -83,6 +83,7 @@ def create_nodes():
         tools = create_agent_tools(
             products_repo=config["configurable"].get("products_repo"),
             knowledge_repo=config["configurable"].get("knowledge_repo"),
+            business_info_repo=config["configurable"].get("business_info_repo"),
             vendor_id=config["configurable"].get("vendor_id"),
             vendor_dict=config["configurable"].get("vendor_dict"),
             vendor_settings=config["configurable"].get("vendor_settings"),

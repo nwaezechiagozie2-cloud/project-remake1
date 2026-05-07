@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl
@@ -219,11 +220,26 @@ class KnowledgeEntryResponse(BaseModel):
     is_active: bool
 
 
+class BusinessInfoCreateRequest(BaseModel):
+    title: str = Field(min_length=2, max_length=255)
+    content: str = Field(min_length=10)
+    source_type: str = Field(default="TEXT")
+
+
+class BusinessInfoResponse(BaseModel):
+    id: int
+    title: str
+    content: str
+    source_type: str
+    updated_at: datetime
+
+
 class VendorDashboardResponse(BaseModel):
     vendor: VendorProfileResponse
     settings: VendorSettingsResponse
     products: list[ProductResponse]
     knowledge_entries: list[KnowledgeEntryResponse]
+    business_info: list[BusinessInfoResponse]
     catalogue: VendorCatalogueResponse
 
 

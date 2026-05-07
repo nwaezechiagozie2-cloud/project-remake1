@@ -3,6 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.deps import (
     get_auth_service,
+    get_business_info_repo,
     get_knowledge_repo,
     get_product_repo,
     get_settings_repo,
@@ -10,6 +11,8 @@ from app.api.deps import (
 )
 from app.exceptions import AuthorizationError, ResourceNotFoundError
 from app.schemas.api import (
+    BusinessInfoCreateRequest,
+    BusinessInfoResponse,
     DeleteResponse,
     ErrorResponse,
     ProductCreateRequest,
@@ -82,13 +85,14 @@ async def _ensure_vendor(vendor_id: int, vendors) -> dict:
 
 
 @router.get("/{vendor_id}/dashboard", dependencies=[Depends(_authorize_vendor_scope)], response_model=VendorDashboardResponse)
-async def dashboard(vendor_id: int, vendors=Depends(get_vendor_repo), settings_repo=Depends(get_settings_repo), knowledge_repo=Depends(get_knowledge_repo), products=Depends(get_product_repo)) -> dict:
+async def dashboard(vendor_id: int, vendors=Depends(get_vendor_repo), settings_repo=Depends(get_settings_repo), knowledge_repo=Depends(get_knowledge_repo), business_info=Depends(get_business_info_repo), products=Depends(get_product_repo)) -> dict:
     vendor = await _ensure_vendor(vendor_id, vendors)
     return {
         "vendor": vendor,
         "settings": await settings_repo.get(vendor_id),
         "products": await products.list_for_vendor(vendor_id),
         "knowledge_entries": await knowledge_repo.list_for_vendor(vendor_id),
+        "business_info": await business_info.list_for_vendor(vendor_id),
         "catalogue": {
             "product_catalogue_url": vendor.get("product_catalogue_url"),
             "product_catalogue_media_id": vendor.get("product_catalogue_media_id"),
@@ -181,3 +185,25 @@ async def update_catalogue(vendor_id: int, payload: VendorCatalogueUpdateRequest
         product_catalogue_media_id=updated.get("product_catalogue_media_id"),
         product_catalogue_caption=updated.get("product_catalogue_caption"),
     )
+
+
+@router.get("/{vendor_id}/business-info", dependencies=[Depends(_authorize_vendor_scope)], response_model=list[BusinessInfoResponse])
+async def list_business_info(vendor_id: int, vendors=Depends(get_vendor_repo), business_info=Depends(get_business_info_repo)) -> list[dict]:
+    await _ensure_vendor(vendor_id, vendors)
+    return await business_info.list_for_vendor(vendor_id)
+
+
+@router.post("/{vendor_id}/business-info", dependencies=[Depends(_authorize_vendor_scope)], status_code=201, response_model=BusinessInfoResponse)
+async def create_business_info(vendor_id: int, payload: BusinessInfoCreateRequest, vendors=Depends(get_vendor_repo), business_info=Depends(get_business_info_repo)) -> dict:
+    await _ensure_vendor(vendor_id, vendors)
+    return await business_info.create_for_vendor(vendor_id, payload.model_dump(mode="json"))
+
+
+@router.delete("/{vendor_id}/business-info/{info_id}", dependencies=[Depends(_authorize_vendor_scope)], response_model=DeleteResponse)
+async def delete_business_info(vendor_id: int, info_id: int, vendors=Depends(get_vendor_repo), business_info=Depends(get_business_info_repo)) -> DeleteResponse:
+    await _ensure_vendor(vendor_id, vendors)
+    deleted = await business_info.delete_for_vendor(vendor_id, info_id)
+    if not deleted:
+        raise ResourceNotFoundError("Business info not found")
+    return DeleteResponse(status="deleted")
+

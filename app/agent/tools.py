@@ -15,6 +15,7 @@ from langchain_core.tools import tool
 # ---------------------------------------------------------------------------
 _products_repo = None
 _knowledge_repo = None
+_business_info_repo = None
 _vendor_id: int | None = None
 _vendor_dict: dict | None = None
 _vendor_settings: dict | None = None
@@ -23,6 +24,7 @@ _vendor_settings: dict | None = None
 def create_agent_tools(
     products_repo,
     knowledge_repo,
+    business_info_repo,
     vendor_id: int,
     vendor_dict: dict,
     vendor_settings: dict,
@@ -31,14 +33,15 @@ def create_agent_tools(
     Create tool instances bound to the current vendor's data.
     Called per-request so each invocation has the right vendor context.
     """
-    global _products_repo, _knowledge_repo, _vendor_id, _vendor_dict, _vendor_settings
+    global _products_repo, _knowledge_repo, _business_info_repo, _vendor_id, _vendor_dict, _vendor_settings
     _products_repo = products_repo
     _knowledge_repo = knowledge_repo
+    _business_info_repo = business_info_repo
     _vendor_id = vendor_id
     _vendor_dict = vendor_dict
     _vendor_settings = vendor_settings
 
-    return [search_products, search_knowledge_base, get_store_catalogue, request_bank_details_and_vendor_approval]
+    return [search_products, search_business_info, get_store_catalogue, request_bank_details_and_vendor_approval]
 
 
 @tool
@@ -75,31 +78,22 @@ async def search_products(query: str) -> str:
 
 
 @tool
-async def search_knowledge_base(query: str) -> str:
-    """Search the store's FAQ and knowledge base for answers about delivery, payment,
+async def search_business_info(query: str) -> str:
+    """Search the store's business information for answers about delivery, payment,
     returns, store hours, location, policies, etc.
     IMPORTANT: Provide 1-2 simple keywords as the query (e.g. 'delivery'), NOT the full question."""
-    if not _knowledge_repo or not _vendor_id:
-        return "No knowledge base available."
+    if not _business_info_repo or not _vendor_id:
+        return "No business information available."
 
     settings = _vendor_settings or {}
     if not settings.get("enable_knowledge_base_answers", True):
-        return "Knowledge base is disabled for this store."
+        return "Business info search is disabled for this store."
 
-    # Build allowed entry types from vendor settings
-    allowed_types = ["FAQ"]
-    if settings.get("allow_product_qa", True):
-        allowed_types.append("PRODUCT")
-    if settings.get("allow_office_qa", True):
-        allowed_types.append("OFFICE")
+    content = await _business_info_repo.search(_vendor_id, query)
+    if content:
+        return f"Business Info Match:\n{content}"
 
-    entry = await _knowledge_repo.search(_vendor_id, query, allowed_types=allowed_types)
-    if entry:
-        question = entry.get("question", "")
-        answer = entry.get("answer", "")
-        return f"FAQ Match:\nQuestion: {question}\nAnswer: {answer}"
-
-    return "No matching FAQ found for this question."
+    return "No matching business information found for this query."
 
 
 @tool
