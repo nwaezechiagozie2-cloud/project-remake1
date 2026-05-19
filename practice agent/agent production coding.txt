@@ -1,0 +1,143 @@
+agent production coding prompt
+
+Treat this as a production-grade project, not a demo, toy app, tutorial snippet, or proof of concept.
+
+Build it as if it must be complete, usable, maintainable, and deployable in a real environment.
+
+---
+
+## Core Approach
+
+* Write code with the assumption that real users will use this system.
+* Think in terms of a complete product, not isolated snippets.
+* Ensure the system is end-to-end usable and coherent.
+* Avoid placeholders, stubs, pseudo-implementations, or incomplete flows unless absolutely unavoidable (and clearly mark them).
+
+---
+
+## Architecture & Design
+
+* Structure code in a modular, replaceable, interface-driven way.
+* Break the system into small, self-contained units with clear responsibilities.
+* Each unit should do one meaningful job (single responsibility).
+* Expose clean, minimal contracts between components.
+* Code against abstractions where flexibility is needed, not blindly everywhere.
+* Use interfaces for components that may change, be swapped, or tested independently.
+* Avoid unnecessary abstraction layers that do not provide real value.
+* Prefer composition over inheritance unless inheritance is clearly justified.
+
+---
+
+## Balanced Modularity (Important)
+
+* Keep functions, classes, and modules small and focused, but do not split code mechanically.
+* Only introduce new units when they improve clarity, testability, maintainability, or replaceability.
+* Avoid excessive fragmentation that makes the system hard to follow.
+* A unit should be small enough to understand quickly, but large enough to represent a real concept.
+
+---
+
+## Separation of Concerns
+
+* Separate business logic from:
+
+  * frameworks
+  * I/O
+  * external services
+  * infrastructure (DB, APIs, queues, etc.)
+* Do not hardcode implementation details deep inside core logic.
+* Use adapters/wrappers around external systems.
+
+---
+
+## Dependency Management
+
+* Use dependency injection or explicit dependency passing.
+* Avoid hidden dependencies and tightly coupled modules.
+* Ensure components can be replaced without forcing changes across the system.
+
+---
+
+## Production Mindset
+
+* Handle invalid input, edge cases, and failure paths properly.
+* Do not assume ideal conditions.
+* Add meaningful error handling and validation.
+* Avoid fragile code, hidden assumptions, and hardcoded secrets.
+* Prefer explicitness over magic.
+* Make decisions as if another engineer will maintain the code.
+
+---
+
+## Completeness Requirements
+
+* Deliver a complete, working system — not just core logic.
+* Ensure the main user flow is fully functional.
+* Include all necessary supporting pieces where relevant:
+
+  * configuration management
+  * environment variables
+  * logging
+  * validation
+  * persistence/storage
+  * error handling
+  * retries/timeouts (where appropriate)
+  * clear boundaries between components
+  * testable structure
+
+---
+
+## Code Quality
+
+* Write clean, production-style code.
+* Use clear and descriptive naming.
+* Keep functions and classes focused without over-fragmenting.
+* Prioritize readability, maintainability, and correctness over cleverness.
+* Avoid unnecessary complexity and over-engineering.
+* Scale the level of abstraction to the complexity of the problem.
+
+---
+
+## Backend / AI / Agent Systems
+
+* Treat orchestration, tools, provider access, storage, and transport as separate system components.
+* Keep core logic framework-agnostic where possible.
+* Do not hardcode provider-specific logic into core workflows.
+* Design the system so providers and tools can be swapped easily.
+* Make each module testable in isolation.
+
+---
+
+## Implementation Process
+
+1. Understand the problem and required complexity.
+2. Identify which parts are likely to change.
+3. Define contracts/interfaces only where needed.
+4. Implement core logic clearly and correctly.
+5. Add modularity and replaceability where it provides real value.
+6. Ensure the system is complete and usable.
+
+---
+
+## Output Requirements
+
+* Return code that can realistically serve as a production-ready starting point.
+* Do not simplify away essential parts for brevity.
+* Do not give tutorial-style explanations unless explicitly requested.
+* Do not output only high-level architecture — provide real implementation.
+* Make reasonable engineering tradeoffs that favor completeness, stability, and usability.
+
+---
+
+## Core Principle
+
+Optimize for:
+
+* readability
+* maintainability
+* replaceability
+* low coupling
+* clear system flow
+
+—not just strict adherence to patterns or extreme modularity.
+

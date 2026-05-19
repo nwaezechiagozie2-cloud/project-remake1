@@ -18,6 +18,8 @@ class Vendor(Base):
     whatsapp_number: Mapped[str | None] = mapped_column(String(50), unique=True)
     whatsapp_token: Mapped[str | None] = mapped_column(Text)
     whatsapp_phone_number_id: Mapped[str | None] = mapped_column(String(100), unique=True)
+    instagram_page_id: Mapped[str | None] = mapped_column(String(100), unique=True)
+    instagram_page_token: Mapped[str | None] = mapped_column(Text)
     account_number: Mapped[str | None] = mapped_column(String(30))
     bank_name: Mapped[str | None] = mapped_column(String(100))
     account_name: Mapped[str | None] = mapped_column(String(255))
@@ -35,23 +37,8 @@ class VendorBotSetting(Base):
     enable_knowledge_base_answers: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     allow_product_qa: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     allow_office_qa: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
+    use_product_availability: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
-
-
-class VendorKnowledgeEntry(Base):
-    __tablename__ = "vendor_knowledge_entries"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
-    entry_type: Mapped[str] = mapped_column(
-        Enum("PRODUCT", "OFFICE", "FAQ", name="vendor_knowledge_entry_type", native_enum=False),
-        server_default=text("'FAQ'"),
-    )
-    title: Mapped[str | None] = mapped_column(String(255))
-    question: Mapped[str | None] = mapped_column(Text)
-    answer: Mapped[str] = mapped_column(Text, nullable=False)
-    keywords: Mapped[str | None] = mapped_column(Text)
-    is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
 
 
 class VendorBusinessInfo(Base):
@@ -63,6 +50,38 @@ class VendorBusinessInfo(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_type: Mapped[str] = mapped_column(String(50), server_default=text("'TEXT'"))  # TEXT, PDF
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class VendorCatalogueUpload(Base):
+    __tablename__ = "vendor_catalogue_uploads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str | None] = mapped_column(String(120))
+    source_url: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), server_default=text("'PENDING'"))
+    extracted_text: Mapped[str | None] = mapped_column(Text)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class CatalogueImportItem(Base):
+    __tablename__ = "catalogue_import_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    upload_id: Mapped[int] = mapped_column(ForeignKey("vendor_catalogue_uploads.id", ondelete="CASCADE"), index=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    price: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str] = mapped_column(String(10), server_default=text("'NGN'"))
+    in_stock: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
+    raw_text: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), server_default=text("'DRAFT'"))
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class Product(Base):
@@ -85,7 +104,8 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    whatsapp_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    whatsapp_number: Mapped[str | None] = mapped_column(String(50), unique=True)
+    instagram_id: Mapped[str | None] = mapped_column(String(100), unique=True)
     name: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(50))
     delivery_address: Mapped[str | None] = mapped_column(Text)

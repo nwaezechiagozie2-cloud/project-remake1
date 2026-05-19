@@ -1,7 +1,10 @@
+from datetime import datetime
+
 from sqlalchemy import or_, select
 
 from app.repositories.base import get_session
 from app.repositories.models import (
+    CatalogueImportItem,
     ConversationState,
     Customer,
     Message,
@@ -10,9 +13,9 @@ from app.repositories.models import (
     Vendor,
     VendorBotSetting,
     VendorBusinessInfo,
+    VendorCatalogueUpload,
     VendorCustomer,
     VendorGoogleToken,
-    VendorKnowledgeEntry,
 )
 
 
@@ -26,6 +29,8 @@ def _vendor_dict(vendor: Vendor | None) -> dict | None:
         "whatsapp_number": vendor.whatsapp_number,
         "whatsapp_token": vendor.whatsapp_token,
         "whatsapp_phone_number_id": vendor.whatsapp_phone_number_id,
+        "instagram_page_id": vendor.instagram_page_id,
+        "instagram_page_token": vendor.instagram_page_token,
         "account_number": vendor.account_number,
         "bank_name": vendor.bank_name,
         "account_name": vendor.account_name,
@@ -49,6 +54,42 @@ def _product_dict(product: Product | None) -> dict | None:
         "image_url": product.image_url,
         "video_url": product.video_url,
         "in_stock": bool(product.in_stock),
+    }
+
+
+def _catalogue_upload_dict(upload: VendorCatalogueUpload | None) -> dict | None:
+    if not upload:
+        return None
+    return {
+        "id": upload.id,
+        "vendor_id": upload.vendor_id,
+        "file_name": upload.file_name,
+        "mime_type": upload.mime_type,
+        "source_url": upload.source_url,
+        "status": upload.status,
+        "extracted_text": upload.extracted_text,
+        "error_message": upload.error_message,
+        "created_at": upload.created_at,
+        "processed_at": upload.processed_at,
+    }
+
+
+def _catalogue_item_dict(item: CatalogueImportItem | None) -> dict | None:
+    if not item:
+        return None
+    return {
+        "id": item.id,
+        "upload_id": item.upload_id,
+        "vendor_id": item.vendor_id,
+        "name": item.name,
+        "description": item.description,
+        "price": float(item.price) if item.price is not None else None,
+        "currency": item.currency,
+        "in_stock": bool(item.in_stock),
+        "raw_text": item.raw_text,
+        "status": item.status,
+        "product_id": item.product_id,
+        "created_at": item.created_at,
     }
 
 
@@ -89,6 +130,23 @@ class SQLVendorRepository:
             for key in ("product_catalogue_url", "product_catalogue_media_id", "product_catalogue_caption"):
                 if key in payload:
                     setattr(vendor, key, payload[key])
+            await session.flush()
+            return _vendor_dict(vendor)
+
+    async def get_by_instagram_page_id(self, page_id: str) -> dict | None:
+        async with get_session() as session:
+            vendor = (await session.execute(
+                select(Vendor).where(Vendor.instagram_page_id == page_id)
+            )).scalar_one_or_none()
+            return _vendor_dict(vendor)
+
+    async def update_instagram_credentials(self, vendor_id: int, page_id: str, page_token: str) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return None
+            vendor.instagram_page_id = page_id
+            vendor.instagram_page_token = page_token
             await session.flush()
             return _vendor_dict(vendor)
 
@@ -158,6 +216,125 @@ class SQLProductRepository:
             return True
 
 
+class SQLCatalogueRepository:
+    async def create_upload(self, vendor_id: int, payload: dict) -> dict:
+        async with get_session() as session:
+            row = VendorCatalogueUpload(vendor_id=vendor_id, **payload)
+            session.add(row)
+            await session.flush()
+            return _catalogue_upload_dict(row) or {}
+
+    async def get_upload_for_vendor(self, vendor_id: int, upload_id: int) -> dict | None:
+        async with get_session() as session:
+            row = (await session.execute(
+                select(VendorCatalogueUpload).where(
+                    VendorCatalogueUpload.vendor_id == vendor_id,
+                    VendorCatalogueUpload.id == upload_id,
+                )
+            )).scalar_one_or_none()
+            return _catalogue_upload_dict(row)
+
+    async def list_uploads_for_vendor(self, vendor_id: int) -> list[dict]:
+        async with get_session() as session:
+            rows = (await session.execute(
+                select(VendorCatalogueUpload)
+                .where(VendorCatalogueUpload.vendor_id == vendor_id)
+                .order_by(VendorCatalogueUpload.id.desc())
+            )).scalars().all()
+            return [item for item in (_catalogue_upload_dict(row) for row in rows) if item]
+
+    async def mark_upload_processed(self, vendor_id: int, upload_id: int, extracted_text: str, item_payloads: list[dict]) -> dict | None:
+        async with get_session() as session:
+            upload = (await session.execute(
+                select(VendorCatalogueUpload).where(
+                    VendorCatalogueUpload.vendor_id == vendor_id,
+                    VendorCatalogueUpload.id == upload_id,
+                )
+            )).scalar_one_or_none()
+            if not upload:
+                return None
+
+            upload.status = "PROCESSED"
+            upload.extracted_text = extracted_text
+            upload.error_message = None
+            upload.processed_at = datetime.utcnow()
+
+            for payload in item_payloads:
+                session.add(CatalogueImportItem(vendor_id=vendor_id, upload_id=upload_id, **payload))
+
+            if extracted_text.strip():
+                session.add(
+                    VendorBusinessInfo(
+                        vendor_id=vendor_id,
+                        title=f"Catalogue: {upload.file_name}",
+                        content=extracted_text.strip(),
+                        source_type="CATALOGUE",
+                    )
+                )
+
+            await session.flush()
+            return _catalogue_upload_dict(upload)
+
+    async def mark_upload_failed(self, vendor_id: int, upload_id: int, error_message: str) -> dict | None:
+        async with get_session() as session:
+            upload = (await session.execute(
+                select(VendorCatalogueUpload).where(
+                    VendorCatalogueUpload.vendor_id == vendor_id,
+                    VendorCatalogueUpload.id == upload_id,
+                )
+            )).scalar_one_or_none()
+            if not upload:
+                return None
+            upload.status = "FAILED"
+            upload.error_message = error_message
+            upload.processed_at = datetime.utcnow()
+            await session.flush()
+            return _catalogue_upload_dict(upload)
+
+    async def list_items_for_upload(self, vendor_id: int, upload_id: int) -> list[dict]:
+        async with get_session() as session:
+            rows = (await session.execute(
+                select(CatalogueImportItem)
+                .where(
+                    CatalogueImportItem.vendor_id == vendor_id,
+                    CatalogueImportItem.upload_id == upload_id,
+                )
+                .order_by(CatalogueImportItem.id.asc())
+            )).scalars().all()
+            return [item for item in (_catalogue_item_dict(row) for row in rows) if item]
+
+    async def import_item_as_product(self, vendor_id: int, item_id: int) -> dict | None:
+        async with get_session() as session:
+            item = (await session.execute(
+                select(CatalogueImportItem).where(
+                    CatalogueImportItem.vendor_id == vendor_id,
+                    CatalogueImportItem.id == item_id,
+                )
+            )).scalar_one_or_none()
+            if not item:
+                return None
+            if item.product_id:
+                product = await session.get(Product, item.product_id)
+                return _product_dict(product)
+            if item.price is None:
+                return None
+
+            product = Product(
+                vendor_id=vendor_id,
+                name=item.name,
+                description=item.description,
+                price=item.price,
+                currency=item.currency,
+                in_stock=item.in_stock,
+            )
+            session.add(product)
+            await session.flush()
+            item.product_id = product.id
+            item.status = "IMPORTED"
+            await session.flush()
+            return _product_dict(product)
+
+
 class SQLCustomerRepository:
     async def get_or_create_by_whatsapp(self, whatsapp_number: str, display_name: str | None = None) -> dict:
         async with get_session() as session:
@@ -180,6 +357,29 @@ class SQLCustomerRepository:
                 "id": customer.id,
                 "name": customer.name,
                 "whatsapp_number": customer.whatsapp_number,
+            }
+
+    async def get_or_create_by_instagram(self, instagram_id: str, display_name: str | None = None) -> dict:
+        async with get_session() as session:
+            customer = (await session.execute(
+                select(Customer).where(Customer.instagram_id == instagram_id)
+            )).scalar_one_or_none()
+            if customer:
+                if display_name and not customer.name:
+                    customer.name = display_name
+                    await session.flush()
+                return {
+                    "id": customer.id,
+                    "name": customer.name,
+                    "instagram_id": customer.instagram_id,
+                }
+            customer = Customer(instagram_id=instagram_id, name=display_name)
+            session.add(customer)
+            await session.flush()
+            return {
+                "id": customer.id,
+                "name": customer.name,
+                "instagram_id": customer.instagram_id,
             }
 
     async def upsert_vendor_customer(self, vendor_id: int, customer_id: int) -> None:
@@ -341,12 +541,14 @@ class SQLVendorSettingsRepository:
                     "enable_knowledge_base_answers": True,
                     "allow_product_qa": True,
                     "allow_office_qa": True,
+                    "use_product_availability": True,
                 }
             return {
                 "confirm_before_sending_account_details": bool(row.confirm_before_sending_account_details),
                 "enable_knowledge_base_answers": bool(row.enable_knowledge_base_answers),
                 "allow_product_qa": bool(row.allow_product_qa),
                 "allow_office_qa": bool(row.allow_office_qa),
+                "use_product_availability": bool(row.use_product_availability),
             }
 
     async def upsert(self, vendor_id: int, payload: dict) -> dict:
@@ -363,134 +565,7 @@ class SQLVendorSettingsRepository:
                 "enable_knowledge_base_answers": bool(row.enable_knowledge_base_answers),
                 "allow_product_qa": bool(row.allow_product_qa),
                 "allow_office_qa": bool(row.allow_office_qa),
-            }
-
-
-class SQLKnowledgeRepository:
-    async def list_for_vendor(self, vendor_id: int) -> list[dict]:
-        async with get_session() as session:
-            rows = (await session.execute(
-                select(VendorKnowledgeEntry).where(VendorKnowledgeEntry.vendor_id == vendor_id)
-            )).scalars().all()
-            return [
-                {
-                    "id": row.id,
-                    "entry_type": row.entry_type,
-                    "title": row.title,
-                    "question": row.question,
-                    "answer": row.answer,
-                    "keywords": row.keywords,
-                    "is_active": bool(row.is_active),
-                }
-                for row in rows
-            ]
-
-    async def get_for_vendor(self, vendor_id: int, entry_id: int) -> dict | None:
-        async with get_session() as session:
-            row = (await session.execute(
-                select(VendorKnowledgeEntry).where(
-                    VendorKnowledgeEntry.vendor_id == vendor_id,
-                    VendorKnowledgeEntry.id == entry_id,
-                )
-            )).scalar_one_or_none()
-            if not row:
-                return None
-            return {
-                "id": row.id,
-                "entry_type": row.entry_type,
-                "title": row.title,
-                "question": row.question,
-                "answer": row.answer,
-                "keywords": row.keywords,
-                "is_active": bool(row.is_active),
-            }
-
-    async def create_for_vendor(self, vendor_id: int, payload: dict) -> dict:
-        async with get_session() as session:
-            row = VendorKnowledgeEntry(vendor_id=vendor_id, **payload)
-            session.add(row)
-            await session.flush()
-            return {
-                "id": row.id,
-                "entry_type": row.entry_type,
-                "title": row.title,
-                "question": row.question,
-                "answer": row.answer,
-                "keywords": row.keywords,
-                "is_active": bool(row.is_active),
-            }
-
-    async def update_for_vendor(self, vendor_id: int, entry_id: int, payload: dict) -> dict | None:
-        async with get_session() as session:
-            row = (await session.execute(
-                select(VendorKnowledgeEntry).where(
-                    VendorKnowledgeEntry.vendor_id == vendor_id,
-                    VendorKnowledgeEntry.id == entry_id,
-                )
-            )).scalar_one_or_none()
-            if not row:
-                return None
-            for key, value in payload.items():
-                setattr(row, key, value)
-            await session.flush()
-            return {
-                "id": row.id,
-                "entry_type": row.entry_type,
-                "title": row.title,
-                "question": row.question,
-                "answer": row.answer,
-                "keywords": row.keywords,
-                "is_active": bool(row.is_active),
-            }
-
-    async def delete_for_vendor(self, vendor_id: int, entry_id: int) -> bool:
-        async with get_session() as session:
-            row = (await session.execute(
-                select(VendorKnowledgeEntry).where(
-                    VendorKnowledgeEntry.vendor_id == vendor_id,
-                    VendorKnowledgeEntry.id == entry_id,
-                )
-            )).scalar_one_or_none()
-            if not row:
-                return False
-            await session.delete(row)
-            return True
-
-    async def search(self, vendor_id: int, query: str, allowed_types: list[str] | None = None) -> dict | None:
-        normalized = query.strip().lower()
-        if not normalized:
-            return None
-
-        async with get_session() as session:
-            stmt = select(VendorKnowledgeEntry).where(
-                VendorKnowledgeEntry.vendor_id == vendor_id,
-                VendorKnowledgeEntry.is_active.is_(True),
-            )
-            if allowed_types:
-                stmt = stmt.where(VendorKnowledgeEntry.entry_type.in_(allowed_types))
-
-            like_q = f"%{normalized}%"
-            from sqlalchemy import func as sa_func
-            stmt = stmt.where(
-                or_(
-                    sa_func.lower(VendorKnowledgeEntry.title).like(like_q),
-                    sa_func.lower(VendorKnowledgeEntry.question).like(like_q),
-                    sa_func.lower(VendorKnowledgeEntry.answer).like(like_q),
-                    sa_func.lower(VendorKnowledgeEntry.keywords).like(like_q),
-                )
-            )
-            stmt = stmt.order_by(VendorKnowledgeEntry.id.asc()).limit(1)
-            entry = (await session.execute(stmt)).scalar_one_or_none()
-            if not entry:
-                return None
-            return {
-                "id": entry.id,
-                "entry_type": entry.entry_type,
-                "title": entry.title,
-                "question": entry.question,
-                "answer": entry.answer,
-                "keywords": entry.keywords,
-                "is_active": bool(entry.is_active),
+                "use_product_availability": bool(row.use_product_availability),
             }
 
 
@@ -572,4 +647,3 @@ class SQLBusinessInfoRepository:
             )).scalar_one_or_none()
             
             return row.content if row else None
-

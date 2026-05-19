@@ -7,7 +7,7 @@ Vendor button taps → Structured handler (system-level, not AI)
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from app.config import Settings
-from app.domain.interfaces import BusinessInfoRepository, KnowledgeRepository, ProductRepository, VendorSettingsRepository, CustomerRepository
+from app.domain.interfaces import BusinessInfoRepository, ProductRepository, VendorSettingsRepository, CustomerRepository
 from app.domain.models import AgentDecision, ParsedInboundMessage
 from app.agent.agent import create_customer_agent, run_customer_agent
 
@@ -17,14 +17,12 @@ class AgentService:
         self,
         settings: Settings,
         products: ProductRepository,
-        knowledge: KnowledgeRepository,
         business_info: BusinessInfoRepository,
         customers: CustomerRepository,
         vendor_settings: VendorSettingsRepository,
     ) -> None:
         self._settings = settings
         self._products = products
-        self._knowledge = knowledge
         self._business_info = business_info
         self._customers = customers
         self._vendor_settings = vendor_settings
@@ -55,7 +53,10 @@ class AgentService:
         )
 
     async def _handle_customer_message(self, vendor: dict, message: ParsedInboundMessage) -> AgentDecision:
-        customer = await self._customers.get_or_create_by_whatsapp(message.from_number, message.profile_name)
+        if message.platform == "instagram":
+            customer = await self._customers.get_or_create_by_instagram(message.from_number, message.profile_name)
+        else:
+            customer = await self._customers.get_or_create_by_whatsapp(message.from_number, message.profile_name)
         customer_id = customer["id"]
         
         state = await self._customers.get_order_lifecycle_state(vendor_id=vendor["id"], customer_id=customer_id)
@@ -67,7 +68,6 @@ class AgentService:
             agent = create_customer_agent(
                 settings=self._settings,
                 products_repo=self._products,
-                knowledge_repo=self._knowledge,
                 business_info_repo=self._business_info,
                 vendor_id=vendor["id"],
                 vendor_dict=vendor,
@@ -81,7 +81,8 @@ class AgentService:
                     order_status="INQUIRY",
                 )
 
-            thread_id = f"{vendor['id']}_{message.from_number}"
+            platform_prefix = "ig" if message.platform == "instagram" else "wa"
+            thread_id = f"{vendor['id']}_{platform_prefix}_{message.from_number}"
 
             result = await run_customer_agent(
                 agent=agent,
@@ -89,7 +90,6 @@ class AgentService:
                 vendor_id=vendor["id"],
                 thread_id=thread_id,
                 products_repo=self._products,
-                knowledge_repo=self._knowledge,
                 business_info_repo=self._business_info,
                 vendor_dict=vendor,
                 vendor_settings=vendor_settings,

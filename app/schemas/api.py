@@ -128,6 +128,10 @@ class ProductUpdateRequest(BaseModel):
     in_stock: bool | None = None
 
 
+class ProductAvailabilityUpdateRequest(BaseModel):
+    in_stock: bool
+
+
 class ProductResponse(BaseModel):
     id: int
     vendor_id: int
@@ -156,6 +160,7 @@ class VendorSettingsUpdateRequest(BaseModel):
                 "enable_knowledge_base_answers": True,
                 "allow_product_qa": True,
                 "allow_office_qa": True,
+                "use_product_availability": True,
             }
         }
     )
@@ -164,6 +169,7 @@ class VendorSettingsUpdateRequest(BaseModel):
     enable_knowledge_base_answers: bool | None = None
     allow_product_qa: bool | None = None
     allow_office_qa: bool | None = None
+    use_product_availability: bool | None = None
 
 
 class VendorSettingsResponse(BaseModel):
@@ -171,6 +177,7 @@ class VendorSettingsResponse(BaseModel):
     enable_knowledge_base_answers: bool
     allow_product_qa: bool
     allow_office_qa: bool
+    use_product_availability: bool
 
 
 class VendorCatalogueUpdateRequest(BaseModel):
@@ -195,6 +202,40 @@ class VendorCatalogueResponse(BaseModel):
     product_catalogue_caption: str | None = None
 
 
+class CatalogueUploadResponse(BaseModel):
+    id: int
+    vendor_id: int
+    file_name: str
+    mime_type: str | None = None
+    source_url: str | None = None
+    status: str
+    extracted_text: str | None = None
+    error_message: str | None = None
+    created_at: datetime
+    processed_at: datetime | None = None
+
+
+class CatalogueUploadCreateRequest(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    mime_type: str | None = Field(default=None, max_length=120)
+    content_base64: str = Field(min_length=1)
+
+
+class CatalogueImportItemResponse(BaseModel):
+    id: int
+    upload_id: int
+    vendor_id: int
+    name: str
+    description: str | None = None
+    price: float | None = None
+    currency: str
+    in_stock: bool
+    raw_text: str | None = None
+    status: str
+    product_id: int | None = None
+    created_at: datetime
+
+
 class VendorProfileResponse(BaseModel):
     id: int
     name: str
@@ -202,22 +243,14 @@ class VendorProfileResponse(BaseModel):
     whatsapp_number: str | None = None
     whatsapp_token: str | None = None
     whatsapp_phone_number_id: str | None = None
+    instagram_page_id: str | None = None
+    instagram_connected: bool = False
     account_number: str | None = None
     bank_name: str | None = None
     account_name: str | None = None
     product_catalogue_url: str | None = None
     product_catalogue_media_id: str | None = None
     product_catalogue_caption: str | None = None
-
-
-class KnowledgeEntryResponse(BaseModel):
-    id: int
-    entry_type: str
-    title: str | None = None
-    question: str | None = None
-    answer: str
-    keywords: str | None = None
-    is_active: bool
 
 
 class BusinessInfoCreateRequest(BaseModel):
@@ -238,7 +271,6 @@ class VendorDashboardResponse(BaseModel):
     vendor: VendorProfileResponse
     settings: VendorSettingsResponse
     products: list[ProductResponse]
-    knowledge_entries: list[KnowledgeEntryResponse]
     business_info: list[BusinessInfoResponse]
     catalogue: VendorCatalogueResponse
 
@@ -259,3 +291,23 @@ class WebhookReceiveResponse(BaseModel):
 
     status: str
     messages_received: int
+
+
+class InstagramCredentialsRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "instagram_page_id": "17841400123456789",
+                "instagram_page_token": "EAABwzLixn...",
+            }
+        }
+    )
+
+    instagram_page_id: str = Field(min_length=1, max_length=100)
+    instagram_page_token: str = Field(min_length=1)
+
+
+class InstagramCredentialsResponse(BaseModel):
+    instagram_page_id: str | None = None
+    connected: bool = False
+    message: str = ""

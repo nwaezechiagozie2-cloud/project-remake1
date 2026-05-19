@@ -8,6 +8,7 @@ class ParsedInboundMessage:
     message_id: str | None
     text: str
     message_type: str
+    platform: str = "whatsapp"
     profile_name: str | None = None
     ad_context: dict | None = None
     raw: dict = field(default_factory=dict)

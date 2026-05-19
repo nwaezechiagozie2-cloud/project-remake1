@@ -14,7 +14,6 @@ from langchain_core.tools import tool
 # binding the actual repository instances so the @tool functions can use them.
 # ---------------------------------------------------------------------------
 _products_repo = None
-_knowledge_repo = None
 _business_info_repo = None
 _vendor_id: int | None = None
 _vendor_dict: dict | None = None
@@ -23,7 +22,6 @@ _vendor_settings: dict | None = None
 
 def create_agent_tools(
     products_repo,
-    knowledge_repo,
     business_info_repo,
     vendor_id: int,
     vendor_dict: dict,
@@ -33,9 +31,8 @@ def create_agent_tools(
     Create tool instances bound to the current vendor's data.
     Called per-request so each invocation has the right vendor context.
     """
-    global _products_repo, _knowledge_repo, _business_info_repo, _vendor_id, _vendor_dict, _vendor_settings
+    global _products_repo, _business_info_repo, _vendor_id, _vendor_dict, _vendor_settings
     _products_repo = products_repo
-    _knowledge_repo = knowledge_repo
     _business_info_repo = business_info_repo
     _vendor_id = vendor_id
     _vendor_dict = vendor_dict
@@ -62,14 +59,19 @@ async def search_products(query: str) -> str:
         return "The store has no products listed right now."
 
     lines = []
+    include_availability = (_vendor_settings or {}).get("use_product_availability", True)
     for p in results[:6]:
         price = p.get("price")
         currency = p.get("currency") or "NGN"
         price_str = f"{currency} {price:,.0f}" if price is not None else "Price not listed"
         desc = p.get("description") or ""
         extra = p.get("extra_details") or ""
+        availability = ""
+        if include_availability:
+            availability = " | Available" if p.get("in_stock") else " | Not available"
         lines.append(
             f"- {p.get('name')} | {price_str}"
+            + availability
             + (f" | {desc}" if desc else "")
             + (f" | {extra}" if extra else "")
         )

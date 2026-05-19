@@ -167,6 +167,54 @@ class MemoryKnowledgeRepo:
         return None
 
 
+class MemoryBusinessInfoRepo:
+    """Fake business info repository for agent policy/tool search."""
+
+    ENTRIES = [
+        {
+            "id": 1,
+            "title": "Delivery",
+            "content": "We deliver nationwide. Lagos delivery takes 1-2 business days, outside Lagos takes 3-5 days. Delivery fee starts from NGN 1,500.",
+            "source_type": "TEXT",
+        },
+        {
+            "id": 2,
+            "title": "Payment",
+            "content": "We accept bank transfer. Account details are sent after checkout is approved.",
+            "source_type": "TEXT",
+        },
+        {
+            "id": 3,
+            "title": "Opening Hours",
+            "content": "We are open Monday to Saturday, 9AM to 7PM.",
+            "source_type": "TEXT",
+        },
+    ]
+
+    async def list_for_vendor(self, vendor_id: int) -> list[dict]:
+        return self.ENTRIES
+
+    async def create_for_vendor(self, vendor_id: int, payload: dict) -> dict:
+        row = {"id": len(self.ENTRIES) + 1, **payload}
+        self.ENTRIES.append(row)
+        return row
+
+    async def delete_for_vendor(self, vendor_id: int, info_id: int) -> bool:
+        original_count = len(self.ENTRIES)
+        self.ENTRIES = [entry for entry in self.ENTRIES if entry["id"] != info_id]
+        return len(self.ENTRIES) != original_count
+
+    async def search(self, vendor_id: int, query: str) -> str | None:
+        normalized = query.strip().lower()
+        if not normalized:
+            return None
+        for entry in self.ENTRIES:
+            searchable = f"{entry.get('title', '')} {entry.get('content', '')}".lower()
+            if normalized in searchable:
+                return entry["content"]
+        return None
+
+
 # ── In-memory vendor settings ────────────────────────────────────────────────
 
 class MemorySettingsRepo:
@@ -325,12 +373,14 @@ async def main():
 
     products = MemoryProductRepo()
     knowledge = MemoryKnowledgeRepo()
+    business_info = MemoryBusinessInfoRepo()
     vendor_settings_repo = MemorySettingsRepo()
     customers = MemoryCustomerRepo()
     agent = AgentService(
         settings=settings,
         products=products,
         knowledge=knowledge,
+        business_info=business_info,
         customers=customers,
         vendor_settings=vendor_settings_repo,
     )

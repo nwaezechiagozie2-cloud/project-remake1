@@ -1,20 +1,29 @@
+import base64
+
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import httpx
 
 from app.api.deps import (
     get_auth_service,
     get_business_info_repo,
-    get_knowledge_repo,
+    get_catalogue_repo,
     get_product_repo,
     get_settings_repo,
     get_vendor_repo,
 )
-from app.exceptions import AuthorizationError, ResourceNotFoundError
+from app.exceptions import AuthorizationError, ResourceNotFoundError, ValidationError
 from app.schemas.api import (
     BusinessInfoCreateRequest,
     BusinessInfoResponse,
+    CatalogueImportItemResponse,
+    CatalogueUploadCreateRequest,
+    CatalogueUploadResponse,
     DeleteResponse,
     ErrorResponse,
+    InstagramCredentialsRequest,
+    InstagramCredentialsResponse,
+    ProductAvailabilityUpdateRequest,
     ProductCreateRequest,
     ProductListResponse,
     ProductResponse,
@@ -25,6 +34,7 @@ from app.schemas.api import (
     VendorSettingsResponse,
     VendorSettingsUpdateRequest,
 )
+from app.services.catalogue_ingestion_service import CatalogueIngestionService
 
 STANDARD_ERROR_RESPONSES = {
     400: {
@@ -85,13 +95,12 @@ async def _ensure_vendor(vendor_id: int, vendors) -> dict:
 
 
 @router.get("/{vendor_id}/dashboard", dependencies=[Depends(_authorize_vendor_scope)], response_model=VendorDashboardResponse)
-async def dashboard(vendor_id: int, vendors=Depends(get_vendor_repo), settings_repo=Depends(get_settings_repo), knowledge_repo=Depends(get_knowledge_repo), business_info=Depends(get_business_info_repo), products=Depends(get_product_repo)) -> dict:
+async def dashboard(vendor_id: int, vendors=Depends(get_vendor_repo), settings_repo=Depends(get_settings_repo), business_info=Depends(get_business_info_repo), products=Depends(get_product_repo)) -> dict:
     vendor = await _ensure_vendor(vendor_id, vendors)
     return {
         "vendor": vendor,
         "settings": await settings_repo.get(vendor_id),
         "products": await products.list_for_vendor(vendor_id),
-        "knowledge_entries": await knowledge_repo.list_for_vendor(vendor_id),
         "business_info": await business_info.list_for_vendor(vendor_id),
         "catalogue": {
             "product_catalogue_url": vendor.get("product_catalogue_url"),
@@ -143,6 +152,15 @@ async def update_product(vendor_id: int, product_id: int, payload: ProductUpdate
     return updated
 
 
+@router.patch("/{vendor_id}/products/{product_id}/availability", dependencies=[Depends(_authorize_vendor_scope)], response_model=ProductResponse)
+async def update_product_availability(vendor_id: int, product_id: int, payload: ProductAvailabilityUpdateRequest, vendors=Depends(get_vendor_repo), products=Depends(get_product_repo)) -> dict:
+    await _ensure_vendor(vendor_id, vendors)
+    updated = await products.update_for_vendor(vendor_id, product_id, {"in_stock": payload.in_stock})
+    if not updated:
+        raise ResourceNotFoundError("Product not found")
+    return updated
+
+
 @router.delete("/{vendor_id}/products/{product_id}", dependencies=[Depends(_authorize_vendor_scope)], response_model=DeleteResponse)
 async def delete_product(vendor_id: int, product_id: int, vendors=Depends(get_vendor_repo), products=Depends(get_product_repo)) -> DeleteResponse:
     await _ensure_vendor(vendor_id, vendors)
@@ -187,6 +205,41 @@ async def update_catalogue(vendor_id: int, payload: VendorCatalogueUpdateRequest
     )
 
 
+@router.post("/{vendor_id}/catalogue/uploads", dependencies=[Depends(_authorize_vendor_scope)], status_code=201, response_model=CatalogueUploadResponse)
+async def upload_catalogue_base64(vendor_id: int, payload: CatalogueUploadCreateRequest, vendors=Depends(get_vendor_repo), catalogue=Depends(get_catalogue_repo)) -> dict:
+    await _ensure_vendor(vendor_id, vendors)
+    try:
+        content = base64.b64decode(payload.content_base64, validate=True)
+    except ValueError as exc:
+        raise ValidationError("content_base64 must be valid base64") from exc
+    service = CatalogueIngestionService(catalogue)
+    return await service.ingest_file(vendor_id, payload.file_name, payload.mime_type, content)
+
+
+@router.get("/{vendor_id}/catalogue/uploads", dependencies=[Depends(_authorize_vendor_scope)], response_model=list[CatalogueUploadResponse])
+async def list_catalogue_uploads(vendor_id: int, vendors=Depends(get_vendor_repo), catalogue=Depends(get_catalogue_repo)) -> list[dict]:
+    await _ensure_vendor(vendor_id, vendors)
+    return await catalogue.list_uploads_for_vendor(vendor_id)
+
+
+@router.get("/{vendor_id}/catalogue/uploads/{upload_id}/items", dependencies=[Depends(_authorize_vendor_scope)], response_model=list[CatalogueImportItemResponse])
+async def list_catalogue_import_items(vendor_id: int, upload_id: int, vendors=Depends(get_vendor_repo), catalogue=Depends(get_catalogue_repo)) -> list[dict]:
+    await _ensure_vendor(vendor_id, vendors)
+    upload = await catalogue.get_upload_for_vendor(vendor_id, upload_id)
+    if not upload:
+        raise ResourceNotFoundError("Catalogue upload not found")
+    return await catalogue.list_items_for_upload(vendor_id, upload_id)
+
+
+@router.post("/{vendor_id}/catalogue/items/{item_id}/import", dependencies=[Depends(_authorize_vendor_scope)], status_code=201, response_model=ProductResponse)
+async def import_catalogue_item(vendor_id: int, item_id: int, vendors=Depends(get_vendor_repo), catalogue=Depends(get_catalogue_repo)) -> dict:
+    await _ensure_vendor(vendor_id, vendors)
+    product = await catalogue.import_item_as_product(vendor_id, item_id)
+    if not product:
+        raise ResourceNotFoundError("Catalogue item not found or missing price")
+    return product
+
+
 @router.get("/{vendor_id}/business-info", dependencies=[Depends(_authorize_vendor_scope)], response_model=list[BusinessInfoResponse])
 async def list_business_info(vendor_id: int, vendors=Depends(get_vendor_repo), business_info=Depends(get_business_info_repo)) -> list[dict]:
     await _ensure_vendor(vendor_id, vendors)
@@ -207,3 +260,66 @@ async def delete_business_info(vendor_id: int, info_id: int, vendors=Depends(get
         raise ResourceNotFoundError("Business info not found")
     return DeleteResponse(status="deleted")
 
+
+@router.put("/{vendor_id}/instagram-credentials", dependencies=[Depends(_authorize_vendor_scope)], response_model=InstagramCredentialsResponse)
+async def update_instagram_credentials(
+    vendor_id: int,
+    payload: InstagramCredentialsRequest,
+    vendors=Depends(get_vendor_repo),
+) -> InstagramCredentialsResponse:
+    """Save Instagram page credentials for this vendor."""
+    await _ensure_vendor(vendor_id, vendors)
+
+    page_id = payload.instagram_page_id
+    if not page_id.isdigit():
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(
+                    "https://graph.instagram.com/me",
+                    params={
+                        "fields": "id,username",
+                        "access_token": payload.instagram_page_token,
+                    },
+                )
+                response.raise_for_status()
+                resolved_id = response.json().get("id")
+        except Exception as exc:
+            raise ValidationError(
+                "instagram_page_id must be the numeric Instagram account ID, or the token must be valid so the app can resolve it.",
+                details={"instagram_page_id": page_id},
+            ) from exc
+
+        if not resolved_id:
+            raise ValidationError(
+                "Could not resolve numeric Instagram account ID from the access token.",
+                details={"instagram_page_id": page_id},
+            )
+        page_id = str(resolved_id)
+
+    updated = await vendors.update_instagram_credentials(
+        vendor_id,
+        page_id=page_id,
+        page_token=payload.instagram_page_token,
+    )
+    if not updated:
+        raise ResourceNotFoundError("Vendor not found")
+    return InstagramCredentialsResponse(
+        instagram_page_id=updated.get("instagram_page_id"),
+        connected=True,
+        message="Instagram credentials saved successfully.",
+    )
+
+
+@router.get("/{vendor_id}/instagram-credentials", dependencies=[Depends(_authorize_vendor_scope)], response_model=InstagramCredentialsResponse)
+async def get_instagram_credentials(
+    vendor_id: int,
+    vendors=Depends(get_vendor_repo),
+) -> InstagramCredentialsResponse:
+    """Check if Instagram is connected for this vendor."""
+    vendor = await _ensure_vendor(vendor_id, vendors)
+    page_id = vendor.get("instagram_page_id")
+    return InstagramCredentialsResponse(
+        instagram_page_id=page_id,
+        connected=bool(page_id and vendor.get("instagram_page_token")),
+        message="Instagram is connected." if page_id else "Instagram is not connected.",
+    )

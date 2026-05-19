@@ -22,15 +22,16 @@ class AgentState(TypedDict):
 
 
 SYSTEM_PROMPT = (
-    "You are the OmniClose AI Sales Assistant, a production-grade autonomous agent for an omni-channel store. "
+    "You are a helpful Sales Assistant, a production-grade autonomous agent for an o store. "
     "Your goal is to be helpful, professional, and efficient. Write plain text (no markdown).\n\n"
-    "Core Principles (from ANTIGRAVITY.md):\n"
+    "Core Principles:\n"
     "- Ensure end-to-end usable and coherent interactions.\n"
     "- Handle edge cases and invalid queries gracefully.\n"
     "- Prioritize clarity and correctness over cleverness.\n\n"
+    "- Be nice to customers-\n\n"
     "Operational Rules:\n"
-    "- If a product is missing, say 'We don't have it'.\n"
-    "- Use search_products for items and search_business_info for store policies, delivery info, location, and other business details.\n"
+    "- If a product is missing, say its not available.\n"
+    "- Use search_products to search for items and search_business_info for store policies, delivery info, location, and other business details.\n"
     "- CRITICAL FORBIDDEN ACTION: Never call the request_bank_details_and_vendor_approval tool just because a customer says they 'want' to buy, are 'interested', or 'will take' a product. These are still inquiries.\n"
     "- ONLY CALL request_bank_details_and_vendor_approval when the customer explicitly asks 'How do I pay?', 'What is your account number?', or says 'I am ready to transfer the money now'.\n"
     "- If they just say they want to buy, provide product info and ask: 'Do you want to pay so I can send the details?'\n"
@@ -82,7 +83,6 @@ def create_nodes():
         from app.agent.tools import create_agent_tools
         tools = create_agent_tools(
             products_repo=config["configurable"].get("products_repo"),
-            knowledge_repo=config["configurable"].get("knowledge_repo"),
             business_info_repo=config["configurable"].get("business_info_repo"),
             vendor_id=config["configurable"].get("vendor_id"),
             vendor_dict=config["configurable"].get("vendor_dict"),
@@ -107,20 +107,20 @@ def create_nodes():
             # Better provider identification
             p_name = "Gemini" if "Google" in str(model) else "NVIDIA/Llama"
             try:
-                print(f"  🧠 Attempting {p_name}...")
+                print(f"Attempting {p_name}...")
                 # 30 second timeout for production resilience during multi-step reasoning
                 response = await asyncio.wait_for(model.ainvoke(prompt), timeout=30.0)
                 
                 if response.tool_calls:
                     for tc in response.tool_calls:
-                        print(f"  🛠️ AI calling tool: {tc['name']}")
+                        print(f"AI calling tool: {tc['name']}")
                 return {"messages": [response]}
             except asyncio.TimeoutError:
-                print(f"  ⚠️ {p_name} timed out.")
+                print(f"{p_name} timed out.")
                 last_error = ValueError(f"{p_name} timed out.")
                 continue
             except Exception as e:
-                print(f"  ❌ {p_name} Error: {e}")
+                print(f"{p_name} Error: {e}")
                 last_error = e
                 continue
         
@@ -141,7 +141,7 @@ def should_continue(state: AgentState):
 def create_customer_agent(
     settings: Settings,
     products_repo,
-    knowledge_repo,
+    business_info_repo,
     vendor_id: int,
     vendor_dict: dict,
     vendor_settings: dict,
@@ -154,7 +154,7 @@ def create_customer_agent(
     # 1. Define tools (for the ToolNode)
     tools = create_agent_tools(
         products_repo=products_repo,
-        knowledge_repo=knowledge_repo,
+        business_info_repo=business_info_repo,
         vendor_id=vendor_id,
         vendor_dict=vendor_dict,
         vendor_settings=vendor_settings,
@@ -180,7 +180,7 @@ async def run_customer_agent(
     vendor_id: int,
     thread_id: str,
     products_repo,
-    knowledge_repo,
+    business_info_repo,
     vendor_dict: dict,
     vendor_settings: dict,
     settings: Settings,
@@ -192,7 +192,7 @@ async def run_customer_agent(
         "configurable": {
             "thread_id": thread_id,
             "products_repo": products_repo,
-            "knowledge_repo": knowledge_repo,
+            "business_info_repo": business_info_repo,
             "vendor_id": vendor_id,
             "vendor_dict": vendor_dict,
             "vendor_settings": vendor_settings,
@@ -237,7 +237,7 @@ async def run_customer_agent(
                     # REJECT: Reset status and add a warning for the next turn
                     # This ensures the UI doesn't show the checkout button
                     new_order_status = "INQUIRY"
-                    print("  🛡️ Guardrail: Blocked premature checkout call.")
+                    print("Guardrail: Blocked premature checkout call.")
                 break
 
     return {

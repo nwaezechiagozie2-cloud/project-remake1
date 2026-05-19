@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str = Field(default="", alias="WHATSAPP_APP_SECRET")
     whatsapp_api_version: str = Field(default="v22.0", alias="WHATSAPP_API_VERSION")
 
+    instagram_verify_token: str = Field(default="", alias="INSTAGRAM_VERIFY_TOKEN")
+    instagram_app_secret: str = Field(default="", alias="INSTAGRAM_APP_SECRET")
+    instagram_api_version: str = Field(default="v22.0", alias="INSTAGRAM_API_VERSION")
+    instagram_client_id: str = Field(default="", alias="INSTAGRAM_CLIENT_ID")
+    instagram_redirect_uri: str = Field(default="http://localhost:8001/auth/instagram/callback", alias="INSTAGRAM_REDIRECT_URI")
+
     jwt_secret: str = Field(default="change_me", alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_ttl_hours: int = Field(default=168, alias="JWT_TTL_HOURS")

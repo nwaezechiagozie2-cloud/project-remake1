@@ -1,0 +1,41 @@
+# Nebula Dynamics: Corporate Policy Handbook
+Version 1.2 | Effective Date: January 1, 2026
+
+## 1. Introduction
+Welcome to Nebula Dynamics. This handbook outlines the core policies and procedures that govern our operations and professional conduct. These policies are designed to foster a safe, productive, and inclusive environment for all employees.
+
+## 2. Remote Work and Flexible Hours
+Nebula Dynamics operates on a "Remote-First" philosophy.
+- **Core Hours:** All employees are expected to be available for synchronous collaboration during our core hours of 10:00 AM to 3:00 PM EST.
+- **Location:** Employees may work from any location within a approved tax jurisdiction (currently including the US, Canada, UK, and Germany).
+- **Home Office Stipend:** New hires are eligible for a one-time $1,000 stipend to set up their home office. This can be used for desks, chairs, monitors, and ergonomic equipment.
+
+## 3. Expense Reimbursement
+- **Travel:** All business-related travel must be pre-approved by a Department Head. We reimburse for economy airfare, standard hotel rooms, and a daily meal per-diem of $75.
+- **Software:** Subscriptions for tools required for your role (e.g., IDEs, design software) are fully reimbursable. Personal use of these tools is permitted if it doesn't incur additional costs.
+- **Submission:** Expenses must be submitted via the "Expensify" portal within 30 days of the transaction. Receipts are required for any item over $25.
+
+## 4. Paid Time Off (PTO) and Leave
+- **Unlimited PTO:** We offer a flexible PTO policy. We recommend a minimum of 15 days off per year to prevent burnout. PTO requests longer than 10 consecutive business days require 4 weeks' notice.
+- **Parental Leave:** Nebula Dynamics provides 16 weeks of fully paid parental leave for all new parents (birth, adoption, or foster care), regardless of gender.
+- **Sick Leave:** We do not track sick days. If you are unwell, please focus on recovery and notify your manager as soon as possible.
+
+## 5. Data Security and Confidentiality
+- **Hardware:** All company work must be performed on company-issued hardware. Use of personal devices for company business is strictly prohibited unless using the approved VDI (Virtual Desktop Infrastructure).
+- **Passwords:** Multi-factor authentication (MFA) is mandatory for all company accounts. Passwords must be changed every 90 days.
+- **Confidentiality:** Employees must not disclose proprietary information, including client lists, unreleased source code, or internal financial data, to third parties.
+
+## 6. Diversity, Equity, and Inclusion (DEI)
+Nebula Dynamics is committed to a diverse workforce. We do not discriminate based on race, religion, color, national origin, gender, sexual orientation, age, marital status, veteran status, or disability status. 
+- **Reporting:** Any instances of harassment or discrimination should be reported immediately to HR or via our anonymous whistleblower hotline at 1-800-NEBULA-SAFE.
+
+## 7. Performance Reviews
+- **Frequency:** Formal performance reviews occur bi-annually in June and December.
+- **Feedback:** We encourage a culture of continuous feedback. Monthly 1-on-1 meetings between managers and direct reports are mandatory.
+
+## 8. Termination of Employment
+- **Notice Period:** Except in cases of gross misconduct, a minimum of 2 weeks' notice is requested for voluntary resignations.
+- **Equipment Return:** All company property (laptops, badges, tokens) must be returned on or before the final day of employment.
+
+---
+© 2026 Nebula Dynamics LLC. Proprietary and Confidential.

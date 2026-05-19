@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 import logging
 
-from app.api.deps import get_auth_service, get_google_oauth_service
+from app.api.deps import get_auth_service, get_google_oauth_service, get_instagram_oauth_service
 from app.exceptions import ValidationError
 from app.observability import get_metrics_registry
 from app.schemas.api import AuthResponse, ErrorResponse, GoogleOAuthStatusResponse, VendorLoginRequest, VendorRegisterRequest
 from app.security import rate_limit_dependency
 from app.services.auth_service import AuthService
 from app.services.google_oauth_service import GoogleOAuthService
+from app.services.instagram_oauth_service import InstagramOAuthService
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,42 @@ async def auth_google_callback(
         content=(
             "<html><body><h3>Google OAuth completed successfully.</h3>"
             f"<p>Token saved for vendor <code>{vendor_id}</code>.</p>"
+            "<p>You can close this tab now.</p>"
+            "</body></html>"
+        )
+    )
+
+
+@router.get("/auth/instagram", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
+async def auth_instagram(vendor_id: int, oauth_service: InstagramOAuthService = Depends(get_instagram_oauth_service)):
+    authorization_url = await oauth_service.build_authorization_url(vendor_id)
+    logger.info("instagram_oauth_authorization_redirect | vendor_id=%s", vendor_id)
+    return RedirectResponse(url=authorization_url)
+
+
+@router.get("/auth/instagram/callback")
+async def auth_instagram_callback(
+    request: Request,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    error_description: str | None = None,
+    oauth_service: InstagramOAuthService = Depends(get_instagram_oauth_service),
+) -> HTMLResponse:
+    if error:
+        raise ValidationError("Instagram OAuth failed", details={"error": error, "description": error_description})
+    if not code or not state:
+        raise ValidationError("Missing OAuth callback parameters")
+
+    result = await oauth_service.complete_callback(code=code, state=state)
+    get_metrics_registry().increment("oauth_callbacks_total")
+    logger.info("instagram_oauth_callback_completed | vendor_id=%s", result["vendor_id"])
+
+    username = result.get("username") or result["instagram_page_id"]
+    return HTMLResponse(
+        content=(
+            "<html><body><h3>Instagram OAuth completed successfully.</h3>"
+            f"<p>Connected Instagram account <code>{username}</code> for vendor <code>{result['vendor_id']}</code>.</p>"
             "<p>You can close this tab now.</p>"
             "</body></html>"
         )
