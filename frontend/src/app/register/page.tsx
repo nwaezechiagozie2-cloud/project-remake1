@@ -1,38 +1,33 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { API_ROOT, apiClient, getApiErrorMessage } from "@/lib/api";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError]     = useState("");
+  const [status, setStatus]   = useState("");
   const [loading, setLoading] = useState(false);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleRegister() {
+    if (loading) return;
     setError("");
+    setStatus("");
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || "Registration failed");
+      const { data } = await apiClient.post("/auth/register", form);
+      const { token, vendor_id } = data;
+      if (!token || !vendor_id) {
+        throw new Error("Registration response did not include a token.");
       }
-      const { token, vendor_id } = await res.json();
-      localStorage.setItem("otc_token", token);
-      localStorage.setItem("otc_vendor_id", String(vendor_id));
-      router.push("/dashboard");
+      setStatus("Account created. Opening dashboard...");
+      window.location.href = `${window.location.origin}/auth/complete#token=${encodeURIComponent(token)}&vendor_id=${encodeURIComponent(String(vendor_id))}`;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(`${getApiErrorMessage(err, "Registration failed")} API: ${API_ROOT}/auth/register`);
     } finally {
       setLoading(false);
     }
@@ -63,7 +58,15 @@ export default function RegisterPage() {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div
+          className="space-y-6"
+          onKeyDown={event => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              handleRegister();
+            }
+          }}
+        >
           {fields.map(f => (
             <div key={f.key} className="space-y-2">
               <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">
@@ -86,9 +89,16 @@ export default function RegisterPage() {
             </div>
           )}
 
+          {status && (
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+               <p className="text-[12px] text-emerald-700 font-bold">{status}</p>
+            </div>
+          )}
+
           <div className="space-y-4">
             <button
-              type="submit"
+              type="button"
+              onClick={handleRegister}
               disabled={loading}
               className="w-full bg-[#059669] text-white font-bold text-[14px] py-3 rounded-xl transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#047857]"
             >
@@ -96,10 +106,10 @@ export default function RegisterPage() {
               {!loading && <ArrowRight size={16} />}
             </button>
             <p className="text-[11px] text-gray-400 font-medium text-center leading-relaxed">
-              By clicking "Create account", you agree to our Terms of Service and Privacy Policy.
+              By clicking &quot;Create account&quot;, you agree to our Terms of Service and Privacy Policy.
             </p>
           </div>
-        </form>
+        </div>
 
         {/* List of benefits — small, dense, professional */}
         <div className="mt-14 space-y-4">

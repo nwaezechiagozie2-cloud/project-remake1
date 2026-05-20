@@ -1,8 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { TrendingUp, AlertCircle, CheckCircle, ArrowUpRight, Loader2 } from "lucide-react";
-import { fetchDashboardData } from "@/lib/api";
+import Link from "next/link";
+import { fetchDashboardData, getApiErrorMessage } from "@/lib/api";
+
+type DashboardData = {
+  vendor?: {
+    whatsapp_number?: string | null;
+  };
+  products?: unknown[];
+  business_info?: unknown[];
+};
 
 const orders = [
   { id: "#10403", name: "Sarah Jenkins",  product: "Retro Analog Clock",    amount: "₦14,500", status: "paid",    time: "2m ago"  },
@@ -30,7 +38,7 @@ function Avatar({ name }: { name: string }) {
 }
 
 export default function DashboardPage() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -44,8 +52,8 @@ export default function DashboardPage() {
         }
         const dashboardData = await fetchDashboardData(vendorId, token);
         setData(dashboardData);
-      } catch (err: any) {
-        setError(err.message || "Failed to load dashboard data");
+      } catch (err: unknown) {
+        setError(getApiErrorMessage(err, "Failed to load dashboard data"));
       } finally {
         setLoading(false);
       }
@@ -87,11 +95,12 @@ export default function DashboardPage() {
                  You haven&apos;t connected your WhatsApp Business account yet. Connect now to start receiving inquiries and orders.
                </p>
             </div>
-            <Link href="/settings">
-              <button className="bg-gray-900 text-white px-5 py-2 rounded-xl text-[12px] font-bold hover:bg-black transition-colors shadow-sm shrink-0">
-                 Connect WhatsApp
-              </button>
-            </Link>
+            <button
+              disabled
+              className="bg-gray-100 text-gray-400 px-5 py-2 rounded-xl text-[12px] font-bold cursor-not-allowed border border-gray-200 shrink-0"
+            >
+              Connect WhatsApp
+            </button>
           </div>
         )}
 
@@ -213,7 +222,7 @@ export default function DashboardPage() {
         <div className="mt-10 pt-6 border-t border-gray-100">
           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em] mb-3">AI Insight</p>
           <p className="text-[13px] font-semibold text-gray-800 leading-relaxed max-w-lg">
-            The bot currently manages <span className="text-[#09090b]">{data?.products?.length || 0} products</span> and <span className="text-[#09090b]">{data?.knowledge_entries?.length || 0} FAQs</span>. Consider adding answers on <span className="text-gray-900">shipping timelines</span> to improve deflection further.
+            The bot currently manages <span className="text-[#09090b]">{data?.products?.length || 0} products</span> and <span className="text-[#09090b]">{data?.business_info?.length || 0} information blocks</span>. Consider adding answers on <span className="text-gray-900">shipping timelines</span> to improve deflection further.
           </p>
           <Link href="/knowledge">
             <button className="mt-3 text-[12px] font-bold text-[#09090b] hover:underline flex items-center gap-1">

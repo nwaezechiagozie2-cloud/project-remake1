@@ -1,36 +1,31 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
+import { API_ROOT, apiClient, getApiErrorMessage } from "@/lib/api";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
+  const [status, setStatus]     = useState("");
   const [loading, setLoading]   = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleLogin() {
+    if (loading) return;
     setError("");
+    setStatus("");
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || "Login failed");
+      const { data } = await apiClient.post("/auth/login", { email, password });
+      const { token, vendor_id } = data;
+      if (!token || !vendor_id) {
+        throw new Error("Login response did not include a token.");
       }
-      const { token, vendor_id } = await res.json();
-      localStorage.setItem("otc_token", token);
-      localStorage.setItem("otc_vendor_id", String(vendor_id));
-      router.push("/dashboard");
+      setStatus("Login successful. Opening dashboard...");
+      window.location.href = `${window.location.origin}/auth/complete#token=${encodeURIComponent(token)}&vendor_id=${encodeURIComponent(String(vendor_id))}`;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(`${getApiErrorMessage(err, "Login failed")} API: ${API_ROOT}/auth/login`);
     } finally {
       setLoading(false);
     }
@@ -55,7 +50,15 @@ export default function LoginPage() {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div
+          className="space-y-6"
+          onKeyDown={event => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              handleLogin();
+            }
+          }}
+        >
           <div className="space-y-2">
             <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">
               Email address
@@ -95,15 +98,22 @@ export default function LoginPage() {
             </div>
           )}
 
+          {status && (
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+               <p className="text-[12px] text-emerald-700 font-bold">{status}</p>
+            </div>
+          )}
+
           <button
-            type="submit"
+            type="button"
+            onClick={handleLogin}
             disabled={loading}
             className="w-full bg-[#059669] text-white font-bold text-[14px] py-3 rounded-xl transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#047857]"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : "Sign in"}
             {!loading && <ArrowRight size={16} />}
           </button>
-        </form>
+        </div>
 
         {/* Footer Link */}
         <div className="mt-12 pt-8 border-t border-gray-50 text-center">

@@ -87,12 +87,18 @@ def upgrade() -> None:
                 'MIGRATED_KNOWLEDGE' AS source_type
             FROM vendor_knowledge_entries
             WHERE answer IS NOT NULL AND answer <> ''
+            AND NOT EXISTS (
+                SELECT 1
+                FROM vendor_business_info existing
+                WHERE existing.vendor_id = vendor_knowledge_entries.vendor_id
+                AND existing.title = COALESCE(NULLIF(vendor_knowledge_entries.title, ''), NULLIF(vendor_knowledge_entries.question, ''), 'Imported knowledge entry')
+                AND existing.content = vendor_knowledge_entries.answer
+                AND existing.source_type = 'MIGRATED_KNOWLEDGE'
+            )
             """
         )
 
     if _table_exists(inspector, "vendor_knowledge_entries"):
-        if _index_exists(inspector, "vendor_knowledge_entries", "ix_vendor_knowledge_entries_vendor_id"):
-            op.drop_index("ix_vendor_knowledge_entries_vendor_id", table_name="vendor_knowledge_entries")
         op.drop_table("vendor_knowledge_entries")
 
 

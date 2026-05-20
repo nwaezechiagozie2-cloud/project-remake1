@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import React from 'react';
-import { ArrowRight, Zap, Shield, MessageSquare, Plus } from "lucide-react";
+import { ArrowRight, Zap, Shield, MessageSquare } from "lucide-react";
 
 export default function LandingPage() {
   return (
@@ -116,7 +116,7 @@ export default function LandingPage() {
       <footer className="bg-gray-50 py-24 border-t border-gray-100">
         <div className="max-w-[700px] mx-auto text-center px-8">
            <h2 className="text-[32px] font-black tracking-tight text-gray-900 mb-6">Built for vendors who value speed.</h2>
-           <p className="text-[16px] text-gray-500 font-medium mb-10 leading-relaxed">Stop wasting time answering "how much" and manual follow-ups. Start selling on autopilot today.</p>
+           <p className="text-[16px] text-gray-500 font-medium mb-10 leading-relaxed">Stop wasting time answering &quot;how much&quot; and manual follow-ups. Start selling on autopilot today.</p>
            <Link href="/register">
              <button className="bg-gray-900 text-white px-10 py-4 rounded-2xl font-bold text-[16px] hover:bg-black transition-all flex items-center gap-2 mx-auto">
                 Get Started Now <ArrowRight size={18} />
