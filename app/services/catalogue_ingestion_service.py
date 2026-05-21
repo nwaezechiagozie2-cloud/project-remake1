@@ -1,4 +1,5 @@
 import re
+import logging
 from io import BytesIO
 from decimal import Decimal, InvalidOperation
 
@@ -13,6 +14,8 @@ SUPPORTED_MIME_TYPES = {
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
+
+logger = logging.getLogger(__name__)
 
 
 class CatalogueIngestionService:
@@ -37,6 +40,14 @@ class CatalogueIngestionService:
         try:
             extracted_text = self._extract_text(file_name, mime_type, content)
             candidates = self._parse_product_candidates(extracted_text)
+            logger.info(
+                "catalogue_ingestion_extracted | vendor_id=%s | upload_id=%s | file_name=%s | text_chars=%s | candidate_count=%s",
+                vendor_id,
+                upload["id"],
+                file_name,
+                len(extracted_text),
+                len(candidates),
+            )
             updated = await self._catalogue.mark_upload_processed(
                 vendor_id,
                 upload["id"],
@@ -46,6 +57,13 @@ class CatalogueIngestionService:
             return updated or upload
         except Exception as exc:
             await self._catalogue.mark_upload_failed(vendor_id, upload["id"], str(exc))
+            logger.exception(
+                "catalogue_ingestion_failed | vendor_id=%s | upload_id=%s | file_name=%s | mime_type=%s",
+                vendor_id,
+                upload["id"],
+                file_name,
+                mime_type,
+            )
             raise
 
     def _extract_text(self, file_name: str, mime_type: str | None, content: bytes) -> str:
@@ -94,7 +112,7 @@ class CatalogueIngestionService:
                     "description": None,
                     "price": price,
                     "currency": "NGN",
-                    "in_stock": not self._looks_unavailable(line),
+                    "in_stock": True,
                     "raw_text": line,
                     "status": "DRAFT",
                 }
@@ -129,19 +147,19 @@ class CatalogueIngestionService:
         return text
 
     def _extract_price(self, line: str) -> Decimal | None:
-        match = re.search(r"(?:NGN|N|₦)?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)", line, flags=re.IGNORECASE)
-        if not match:
+        matches = list(re.finditer(r"(?:NGN|N|₦)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)", line, flags=re.IGNORECASE))
+        if not matches:
+            matches = list(re.finditer(r"([0-9][0-9,]*(?:\.[0-9]{1,2})?)", line, flags=re.IGNORECASE))
+        if not matches:
             return None
+        match = matches[-1]
         try:
             return Decimal(match.group(1).replace(",", ""))
         except InvalidOperation:
             return None
 
     def _clean_product_name(self, line: str) -> str:
-        cleaned = re.sub(r"(?:NGN|N|₦)?\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?", "", line, count=1, flags=re.IGNORECASE)
+        cleaned = re.sub(r"(?:NGN|N|₦)\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?", "", line, count=1, flags=re.IGNORECASE)
         cleaned = re.sub(r"^[\-*•\d\.\)\s]+", "", cleaned)
-        cleaned = re.sub(r"\b(in stock|available|out of stock|sold out|unavailable)\b", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\b(in stock|available)\b", "", cleaned, flags=re.IGNORECASE)
         return " ".join(cleaned.replace(" - ", " ").replace(":", " ").split())
-
-    def _looks_unavailable(self, line: str) -> bool:
-        return bool(re.search(r"\b(out of stock|sold out|unavailable)\b", line, flags=re.IGNORECASE))

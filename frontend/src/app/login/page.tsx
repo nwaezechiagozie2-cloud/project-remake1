@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Loader2 } from "lucide-react";
+import { GoogleIcon, InstagramIcon } from "@/components/brand-icons";
 import { API_ROOT, apiClient, getApiErrorMessage } from "@/lib/api";
 
 export default function LoginPage() {
@@ -30,6 +31,10 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
+
+  const handleOAuth = (provider: "google" | "instagram") => {
+    window.location.href = `${API_ROOT}/auth/login/${provider}`;
+  };
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center pt-[15vh] px-6 selection:bg-[#059669]/10 selection:text-[#059669]">
@@ -113,6 +118,24 @@ export default function LoginPage() {
             {loading ? <Loader2 size={16} className="animate-spin" /> : "Sign in"}
             {!loading && <ArrowRight size={16} />}
           </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => handleOAuth("google")}
+              className="w-full bg-white border border-gray-100 text-gray-700 font-bold text-[13px] py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <GoogleIcon />
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOAuth("instagram")}
+              className="w-full bg-white border border-gray-100 text-gray-700 font-bold text-[13px] py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <InstagramIcon />
+              Continue with Instagram
+            </button>
+          </div>
         </div>
 
         {/* Footer Link */}

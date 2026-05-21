@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, MessageSquare, Package, BookOpen, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Package, BookOpen, Settings, LogOut, UserCircle } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 
 const nav = [
@@ -9,6 +9,7 @@ const nav = [
   { href: "/inbox",     icon: MessageSquare,   label: "Inbox"    },
   { href: "/products",  icon: Package,          label: "Products" },
   { href: "/knowledge", icon: BookOpen,         label: "Knowledge"},
+  { href: "/profile",   icon: UserCircle,       label: "Profile"  },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

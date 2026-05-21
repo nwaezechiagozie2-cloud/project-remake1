@@ -9,7 +9,7 @@ type ApiErrorPayload = {
   error?: {
     message?: string;
   };
-  detail?: string;
+  detail?: string | { msg?: string; loc?: unknown[] } | { msg?: string; loc?: unknown[] }[];
 };
 
 export type ProductPayload = {
@@ -37,15 +37,49 @@ export type CatalogueUploadPayload = {
   content_base64: string;
 };
 
+export type CatalogueBulkImportItemPayload = {
+  id: number;
+  name: string;
+  price: number;
+  currency: string;
+  description?: string | null;
+  in_stock?: boolean;
+};
+
+export type VendorProfile = {
+  vendor_id: number;
+  name: string;
+  email: string;
+  email_verified: boolean;
+  email_verified_at: string | null;
+  pending_email: string | null;
+  providers: Record<string, boolean>;
+};
+
 export function getApiErrorMessage(error: unknown, fallback = "Request failed") {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as ApiErrorPayload | undefined;
     if (!error.response) {
       return `Cannot reach backend at ${API_ROOT}. Start FastAPI on that port or set NEXT_PUBLIC_API_URL to the running backend URL.`;
     }
-    return data?.error?.message || data?.detail || error.message || fallback;
+    return data?.error?.message || formatApiDetail(data?.detail) || error.message || fallback;
   }
   return error instanceof Error ? error.message : fallback;
+}
+
+function formatApiDetail(detail: ApiErrorPayload["detail"]) {
+  if (!detail) return "";
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map(item => {
+        const location = Array.isArray(item.loc) ? item.loc.join(".") : "";
+        return [location, item.msg].filter(Boolean).join(": ");
+      })
+      .filter(Boolean)
+      .join("; ");
+  }
+  return detail.msg || JSON.stringify(detail);
 }
 
 export const apiClient = axios.create({
@@ -161,6 +195,12 @@ export const fetchGoogleOAuthStatus = async (vendorId: string | number) => {
   return data;
 };
 
+export const disconnectGoogleContacts = async (vendorId: string | number, token: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.delete("/google-contacts");
+  return data;
+};
+
 export const fetchInstagramCredentials = async (vendorId: string | number, token: string) => {
   const client = getAuthClient(vendorId, token);
   const { data } = await client.get("/instagram-credentials");
@@ -201,4 +241,62 @@ export const importCatalogueItem = async (
   const client = getAuthClient(vendorId, token);
   const { data } = await client.post(`/catalogue/items/${itemId}/import`);
   return data;
+};
+
+export const importCatalogueItems = async (
+  vendorId: string | number,
+  token: string,
+  items: CatalogueBulkImportItemPayload[],
+) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.post("/catalogue/items/import-bulk", { items });
+  return data;
+};
+
+export const fetchVendorProfile = async (vendorId: string | number, token: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.get("/profile");
+  return data as VendorProfile;
+};
+
+export const requestEmailVerification = async (email: string) => {
+  const { data } = await apiClient.post("/auth/verify-email/request", { email });
+  return data;
+};
+
+export const confirmEmailVerification = async (token: string) => {
+  const { data } = await apiClient.post("/auth/verify-email/confirm", { token });
+  return data;
+};
+
+export const requestEmailChange = async (vendorId: string | number, token: string, newEmail: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.post("/profile/email-change/request", { new_email: newEmail });
+  return data;
+};
+
+export const confirmEmailChange = async (vendorId: string | number, token: string, verificationToken: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.post("/profile/email-change/confirm", { token: verificationToken });
+  return data as VendorProfile;
+};
+
+export const changePassword = async (
+  vendorId: string | number,
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.post("/profile/password", {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+  return data;
+};
+
+export const updateVendorProfile = async (vendorId: string | number, token: string, name: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.patch("/profile", { name });
+  return data as VendorProfile;
 };

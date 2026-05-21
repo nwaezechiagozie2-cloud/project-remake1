@@ -7,6 +7,7 @@ from app.repositories.models import (
     CatalogueImportItem,
     ConversationState,
     Customer,
+    EmailVerificationToken,
     Message,
     OrderLifecycleState,
     Product,
@@ -26,6 +27,10 @@ def _vendor_dict(vendor: Vendor | None) -> dict | None:
         "id": vendor.id,
         "name": vendor.name,
         "email": vendor.email,
+        "email_verified_at": vendor.email_verified_at,
+        "pending_email": vendor.pending_email,
+        "google_subject_id": vendor.google_subject_id,
+        "instagram_user_id": vendor.instagram_user_id,
         "whatsapp_number": vendor.whatsapp_number,
         "whatsapp_token": vendor.whatsapp_token,
         "whatsapp_phone_number_id": vendor.whatsapp_phone_number_id,
@@ -103,9 +108,29 @@ class SQLVendorRepository:
             vendor = (await session.execute(select(Vendor).where(Vendor.email == email))).scalar_one_or_none()
             return _vendor_dict(vendor)
 
+    async def get_by_pending_email(self, email: str) -> dict | None:
+        async with get_session() as session:
+            vendor = (await session.execute(select(Vendor).where(Vendor.pending_email == email))).scalar_one_or_none()
+            return _vendor_dict(vendor)
+
+    async def get_by_google_subject_id(self, subject_id: str) -> dict | None:
+        async with get_session() as session:
+            vendor = (await session.execute(select(Vendor).where(Vendor.google_subject_id == subject_id))).scalar_one_or_none()
+            return _vendor_dict(vendor)
+
+    async def get_by_instagram_user_id(self, user_id: str) -> dict | None:
+        async with get_session() as session:
+            vendor = (await session.execute(select(Vendor).where(Vendor.instagram_user_id == user_id))).scalar_one_or_none()
+            return _vendor_dict(vendor)
+
     async def get_password_hash(self, email: str) -> str | None:
         async with get_session() as session:
             vendor = (await session.execute(select(Vendor).where(Vendor.email == email))).scalar_one_or_none()
+            return vendor.password_hash if vendor else None
+
+    async def get_password_hash_by_id(self, vendor_id: int) -> str | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
             return vendor.password_hash if vendor else None
 
     async def get_by_phone_number_id(self, phone_number_id: str) -> dict | None:
@@ -121,6 +146,74 @@ class SQLVendorRepository:
             session.add(vendor)
             await session.flush()
             return _vendor_dict(vendor) or {}
+
+    async def update_password_hash(self, vendor_id: int, password_hash: str) -> bool:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return False
+            vendor.password_hash = password_hash
+            await session.flush()
+            return True
+
+    async def set_email_verified(self, vendor_id: int) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return None
+            vendor.email_verified_at = datetime.utcnow()
+            await session.flush()
+            return _vendor_dict(vendor)
+
+    async def set_pending_email(self, vendor_id: int, email: str | None) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return None
+            vendor.pending_email = email
+            await session.flush()
+            return _vendor_dict(vendor)
+
+    async def apply_pending_email(self, vendor_id: int, email: str) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor or vendor.pending_email != email:
+                return None
+            vendor.email = email
+            vendor.pending_email = None
+            vendor.email_verified_at = datetime.utcnow()
+            await session.flush()
+            return _vendor_dict(vendor)
+
+    async def update_profile(self, vendor_id: int, payload: dict) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return None
+            if "name" in payload:
+                vendor.name = payload["name"]
+            await session.flush()
+            return _vendor_dict(vendor)
+
+    async def link_google_subject(self, vendor_id: int, subject_id: str, mark_email_verified: bool = False) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return None
+            vendor.google_subject_id = subject_id
+            if mark_email_verified:
+                vendor.email_verified_at = vendor.email_verified_at or datetime.utcnow()
+            await session.flush()
+            return _vendor_dict(vendor)
+
+    async def link_instagram_user(self, vendor_id: int, user_id: str) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return None
+            vendor.instagram_user_id = user_id
+            await session.flush()
+            return _vendor_dict(vendor)
 
     async def update_catalogue(self, vendor_id: int, payload: dict) -> dict | None:
         async with get_session() as session:
@@ -149,6 +242,52 @@ class SQLVendorRepository:
             vendor.instagram_page_token = page_token
             await session.flush()
             return _vendor_dict(vendor)
+
+
+class SQLEmailVerificationRepository:
+    async def create_token(self, vendor_id: int, token_hash: str, purpose: str, email: str, expires_at) -> dict:
+        async with get_session() as session:
+            row = EmailVerificationToken(
+                vendor_id=vendor_id,
+                token_hash=token_hash,
+                purpose=purpose,
+                email=email,
+                expires_at=expires_at,
+            )
+            session.add(row)
+            await session.flush()
+            return {
+                "id": row.id,
+                "vendor_id": row.vendor_id,
+                "purpose": row.purpose,
+                "email": row.email,
+                "expires_at": row.expires_at,
+                "used_at": row.used_at,
+            }
+
+    async def consume_token(self, token_hash: str, purpose: str) -> dict | None:
+        async with get_session() as session:
+            now = datetime.utcnow()
+            row = (await session.execute(
+                select(EmailVerificationToken).where(
+                    EmailVerificationToken.token_hash == token_hash,
+                    EmailVerificationToken.purpose == purpose,
+                    EmailVerificationToken.used_at.is_(None),
+                    EmailVerificationToken.expires_at > now,
+                )
+            )).scalar_one_or_none()
+            if not row:
+                return None
+            row.used_at = now
+            await session.flush()
+            return {
+                "id": row.id,
+                "vendor_id": row.vendor_id,
+                "purpose": row.purpose,
+                "email": row.email,
+                "expires_at": row.expires_at,
+                "used_at": row.used_at,
+            }
 
 
 class SQLProductRepository:
@@ -222,6 +361,7 @@ class SQLCatalogueRepository:
             row = VendorCatalogueUpload(vendor_id=vendor_id, **payload)
             session.add(row)
             await session.flush()
+            await session.refresh(row)
             return _catalogue_upload_dict(row) or {}
 
     async def get_upload_for_vendor(self, vendor_id: int, upload_id: int) -> dict | None:
@@ -333,6 +473,65 @@ class SQLCatalogueRepository:
             item.status = "IMPORTED"
             await session.flush()
             return _product_dict(product)
+
+    async def import_items_as_products(self, vendor_id: int, item_payloads: list[dict]) -> list[dict]:
+        if not item_payloads:
+            return []
+
+        async with get_session() as session:
+            item_ids = [payload["id"] for payload in item_payloads]
+            rows = (await session.execute(
+                select(CatalogueImportItem).where(
+                    CatalogueImportItem.vendor_id == vendor_id,
+                    CatalogueImportItem.id.in_(item_ids),
+                )
+            )).scalars().all()
+            items_by_id = {row.id: row for row in rows}
+            products: list[dict] = []
+
+            for payload in item_payloads:
+                item = items_by_id.get(payload["id"])
+                if not item:
+                    continue
+
+                item.name = payload["name"]
+                item.description = payload.get("description")
+                item.price = payload["price"]
+                item.currency = payload.get("currency", "NGN")
+                item.in_stock = payload.get("in_stock", True)
+
+                if item.product_id:
+                    product = await session.get(Product, item.product_id)
+                    if product:
+                        product.name = item.name
+                        product.description = item.description
+                        product.price = item.price
+                        product.currency = item.currency
+                        product.in_stock = item.in_stock
+                        await session.flush()
+                        product_dict = _product_dict(product)
+                        if product_dict:
+                            products.append(product_dict)
+                    continue
+
+                product = Product(
+                    vendor_id=vendor_id,
+                    name=item.name,
+                    description=item.description,
+                    price=item.price,
+                    currency=item.currency,
+                    in_stock=item.in_stock,
+                )
+                session.add(product)
+                await session.flush()
+                item.product_id = product.id
+                item.status = "IMPORTED"
+                product_dict = _product_dict(product)
+                if product_dict:
+                    products.append(product_dict)
+
+            await session.flush()
+            return products
 
 
 class SQLCustomerRepository:
@@ -583,6 +782,14 @@ class SQLGoogleTokenRepository:
             else:
                 session.add(VendorGoogleToken(vendor_id=vendor_id, token_json=token_json))
             await session.flush()
+
+    async def delete_for_vendor(self, vendor_id: int) -> bool:
+        async with get_session() as session:
+            row = await session.get(VendorGoogleToken, vendor_id)
+            if not row:
+                return False
+            await session.delete(row)
+            return True
 
 
 class SQLBusinessInfoRepository:

@@ -12,7 +12,12 @@ from app.config import Settings
 from app.domain.interfaces import GoogleTokenRepository
 from app.observability import get_metrics_registry
 
-SCOPES = ["https://www.googleapis.com/auth/contacts"]
+SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/contacts",
+]
 
 logger = logging.getLogger(__name__)
 

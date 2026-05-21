@@ -1,17 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  MessageSquare,
   Shield,
   Check,
   Copy,
   UserPlus,
-  ArrowUpRight,
   Loader2,
   MessageCircle,
 } from "lucide-react";
 import {
   API_ROOT,
+  disconnectGoogleContacts,
   fetchGoogleOAuthStatus,
   fetchInstagramCredentials,
   fetchVendorBotSettings,
@@ -19,6 +18,7 @@ import {
   updateVendorBotSettings,
   type VendorBotSettings,
 } from "@/lib/api";
+import { GoogleIcon, InstagramIcon } from "@/components/brand-icons";
 
 const defaultSettings: VendorBotSettings = {
   confirm_before_sending_account_details: false,
@@ -103,6 +103,24 @@ export default function SettingsPage() {
     window.location.href = `${API_ROOT}/auth/google?vendor_id=${localStorage.getItem("otc_vendor_id")}`;
   };
 
+  const handleGoogleDisconnect = async () => {
+    const vendorId = localStorage.getItem("otc_vendor_id");
+    const token = localStorage.getItem("otc_token");
+    if (!vendorId || !token) return;
+    try {
+      await disconnectGoogleContacts(vendorId, token);
+      setGoogleStatus("not_connected");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to disconnect Google Contacts"));
+    }
+  };
+
+  const handleInstagramConnect = () => {
+    const vendorId = localStorage.getItem("otc_vendor_id");
+    if (!vendorId) return;
+    window.location.href = `${API_ROOT}/auth/instagram?vendor_id=${vendorId}`;
+  };
+
   const toggleSetting = async (key: SettingKey) => {
     const vendorId = localStorage.getItem("otc_vendor_id");
     const token = localStorage.getItem("otc_token");
@@ -144,56 +162,6 @@ export default function SettingsPage() {
 
         <div className="space-y-12">
           <section className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  <MessageSquare size={16} className="text-emerald-500" />
-                </div>
-                <h2 className="text-[14px] font-bold text-gray-900">WhatsApp Integration</h2>
-              </div>
-              <a
-                href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
-                target="_blank"
-                className="text-[11px] font-bold text-gray-400 hover:text-gray-900 flex items-center gap-1 transition-colors"
-              >
-                Setup Guide <ArrowUpRight size={12} />
-              </a>
-            </div>
-
-            <div className="p-5 bg-gray-50/60 border border-gray-100 rounded-2xl flex items-center justify-between gap-5">
-              <div className="space-y-1">
-                <p className="text-[13px] font-bold text-gray-900">WhatsApp Business</p>
-                <p className="text-[12px] text-gray-400 font-medium leading-relaxed">
-                  Connection setup is intentionally disabled here until the final Meta setup flow is ready.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled
-                className="bg-gray-100 border border-gray-200 text-[12px] font-bold text-gray-400 px-5 py-2 rounded-xl cursor-not-allowed shrink-0"
-              >
-                Connect WhatsApp
-              </button>
-            </div>
-
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-[12px] font-bold text-gray-700">Webhook URL</p>
-                <button
-                  onClick={copyWebhook}
-                  className="flex items-center gap-1.5 text-[11px] font-bold text-[#09090b] hover:bg-white px-2 py-1 rounded-lg transition-colors"
-                >
-                  {copied ? <Check size={12} /> : <Copy size={12} />}
-                  {copied ? "Copied" : "Copy URL"}
-                </button>
-              </div>
-              <code className="block w-full bg-white border border-gray-100 p-2.5 rounded-lg text-[13px] font-mono text-gray-400 truncate">
-                {API_ROOT}/webhook
-              </code>
-            </div>
-          </section>
-
-          <section className="space-y-6 pt-6 border-t border-gray-100">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center">
                 <MessageCircle size={16} className="text-pink-600" />
@@ -205,14 +173,15 @@ export default function SettingsPage() {
               <div className="space-y-1">
                 <p className="text-[13px] font-bold text-gray-900">Instagram DMs</p>
                 <p className="text-[12px] text-gray-400 font-medium">
-                  {instagramConnected ? "Instagram is connected." : "Connect button is a placeholder until you provide the final link."}
+                  {instagramConnected ? "Instagram is connected." : "Connect the Instagram account that should receive and send DMs."}
                 </p>
               </div>
               <button
                 type="button"
-                disabled
-                className="bg-white border border-gray-100 text-[12px] font-bold text-gray-400 px-5 py-2 rounded-xl shadow-sm cursor-not-allowed"
+                onClick={handleInstagramConnect}
+                className="bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
               >
+                <InstagramIcon />
                 Connect Instagram
               </button>
             </div>
@@ -233,13 +202,45 @@ export default function SettingsPage() {
                   Status: <span className="text-gray-700">{googleStatus.replaceAll("_", " ")}</span>
                 </p>
               </div>
+              {googleStatus === "connected" ? (
+                <button
+                  onClick={handleGoogleDisconnect}
+                  className="bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
+                >
+                  <GoogleIcon />
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={handleGoogleConnect}
+                  className="bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
+                >
+                  <GoogleIcon />
+                  Continue with Google
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-6 pt-6 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <Check size={16} className="text-emerald-600" />
+                </div>
+                <h2 className="text-[14px] font-bold text-gray-900">Webhook</h2>
+              </div>
               <button
-                onClick={handleGoogleConnect}
-                className="bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
+                onClick={copyWebhook}
+                className="flex items-center gap-1.5 text-[11px] font-bold text-[#09090b] hover:bg-gray-50 px-2 py-1 rounded-lg transition-colors"
               >
-                Connect Google
+                {copied ? <Check size={12} /> : <Copy size={12} />}
+                {copied ? "Copied" : "Copy URL"}
               </button>
             </div>
+            <code className="block w-full bg-gray-50 border border-gray-100 p-2.5 rounded-lg text-[13px] font-mono text-gray-500 truncate">
+              {API_ROOT}/webhook
+            </code>
           </section>
 
           <section className="space-y-6 pt-6 border-t border-gray-100">

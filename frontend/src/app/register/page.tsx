@@ -2,10 +2,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { GoogleIcon, InstagramIcon } from "@/components/brand-icons";
 import { API_ROOT, apiClient, getApiErrorMessage } from "@/lib/api";
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError]     = useState("");
   const [status, setStatus]   = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,10 +34,13 @@ export default function RegisterPage() {
     }
   }
 
-  const fields: { key: string; label: string; type?: string; placeholder: string }[] = [
-    { key: "name",                    label: "Business Name",        placeholder: "e.g. Acme Studio" },
-    { key: "email",                   label: "Work Email",           type: "email", placeholder: "name@company.com" },
-    { key: "password",                label: "Password",             type: "password", placeholder: "Min. 8 characters" },
+  const handleOAuth = (provider: "google" | "instagram") => {
+    window.location.href = `${API_ROOT}/auth/login/${provider}`;
+  };
+
+  const fields: { key: keyof typeof form; label: string; type?: string; placeholder: string }[] = [
+    { key: "email", label: "Email", type: "email", placeholder: "name@example.com" },
+    { key: "password", label: "Password", type: "password", placeholder: "Min. 8 characters" },
   ];
 
   return (
@@ -75,7 +79,7 @@ export default function RegisterPage() {
               <input
                 type={f.type || "text"}
                 required
-                value={(form as Record<string, string>)[f.key]}
+                value={form[f.key]}
                 onChange={set(f.key)}
                 placeholder={f.placeholder}
                 className="w-full bg-gray-50/50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#059669]/30 focus:bg-white focus:border-[#059669]/40 transition-all placeholder:text-gray-300"
@@ -105,6 +109,24 @@ export default function RegisterPage() {
               {loading ? <Loader2 size={16} className="animate-spin" /> : "Create account"}
               {!loading && <ArrowRight size={16} />}
             </button>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => handleOAuth("google")}
+                className="w-full bg-white border border-gray-100 text-gray-700 font-bold text-[13px] py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <GoogleIcon />
+                Continue with Google
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOAuth("instagram")}
+                className="w-full bg-white border border-gray-100 text-gray-700 font-bold text-[13px] py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <InstagramIcon />
+                Continue with Instagram
+              </button>
+            </div>
             <p className="text-[11px] text-gray-400 font-medium text-center leading-relaxed">
               By clicking &quot;Create account&quot;, you agree to our Terms of Service and Privacy Policy.
             </p>

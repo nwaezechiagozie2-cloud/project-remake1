@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     instagram_api_version: str = Field(default="v22.0", alias="INSTAGRAM_API_VERSION")
     instagram_client_id: str = Field(default="", alias="INSTAGRAM_CLIENT_ID")
     instagram_redirect_uri: str = Field(default="http://localhost:8001/auth/instagram/callback", alias="INSTAGRAM_REDIRECT_URI")
+    instagram_login_redirect_uri: str = Field(default="http://localhost:8001/auth/login/instagram/callback", alias="INSTAGRAM_LOGIN_REDIRECT_URI")
 
     jwt_secret: str = Field(default="change_me", alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
@@ -70,7 +71,9 @@ class Settings(BaseSettings):
     google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
     google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
     google_redirect_uri: str = Field(default="http://localhost:8001/auth/google/callback", alias="GOOGLE_REDIRECT_URI")
+    google_login_redirect_uri: str = Field(default="http://localhost:8001/auth/login/google/callback", alias="GOOGLE_LOGIN_REDIRECT_URI")
     google_customer_group_resource: str = Field(default="", alias="GOOGLE_CUSTOMER_GROUP_RESOURCE")
+    frontend_base_url: str = Field(default="http://localhost:3000", alias="FRONTEND_BASE_URL")
 
 
 @lru_cache(maxsize=1)

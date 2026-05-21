@@ -15,6 +15,10 @@ class Vendor(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    pending_email: Mapped[str | None] = mapped_column(String(255), unique=True)
+    google_subject_id: Mapped[str | None] = mapped_column(String(255), unique=True)
+    instagram_user_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     whatsapp_number: Mapped[str | None] = mapped_column(String(50), unique=True)
     whatsapp_token: Mapped[str | None] = mapped_column(Text)
     whatsapp_phone_number_id: Mapped[str | None] = mapped_column(String(100), unique=True)
@@ -26,6 +30,19 @@ class Vendor(Base):
     product_catalogue_url: Mapped[str | None] = mapped_column(Text)
     product_catalogue_media_id: Mapped[str | None] = mapped_column(String(255))
     product_catalogue_caption: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    purpose: Mapped[str] = mapped_column(String(40), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

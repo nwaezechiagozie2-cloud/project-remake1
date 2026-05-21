@@ -14,7 +14,12 @@ from app.domain.interfaces import GoogleTokenRepository, VendorRepository
 from app.exceptions import ResourceNotFoundError, ValidationError
 from app.observability import get_metrics_registry
 
-SCOPES = ["https://www.googleapis.com/auth/contacts"]
+SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/contacts",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +29,6 @@ class GoogleOAuthService:
         self.settings = settings
         self.vendors = vendors
         self.tokens = tokens
-        self._code_verifiers: dict[str, str] = {}
 
     def _allow_localhost_oauth(self) -> None:
         parsed_redirect_uri = urlparse(self.settings.google_redirect_uri)
@@ -45,9 +49,30 @@ class GoogleOAuthService:
                 "redirect_uris": [self.settings.google_redirect_uri],
             }
         }
-        flow = Flow.from_client_config(client_config, scopes=SCOPES, autogenerate_code_verifier=True)
+        flow = Flow.from_client_config(client_config, scopes=SCOPES)
         flow.redirect_uri = self.settings.google_redirect_uri
         return flow
+
+    @staticmethod
+    def _build_state(vendor_id: int, code_verifier: str | None = None) -> str:
+        state_parts = [str(vendor_id), secrets.token_hex(16)]
+        if code_verifier:
+            state_parts.append(code_verifier)
+        return ":".join(state_parts)
+
+    @staticmethod
+    def _parse_state(state: str) -> tuple[int, str | None]:
+        if not state or ":" not in state:
+            raise ValidationError("Missing vendor state")
+
+        parts = state.split(":")
+        try:
+            vendor_id = int(parts[0])
+        except ValueError as exc:
+            raise ValidationError("Invalid vendor state") from exc
+
+        code_verifier = parts[2] if len(parts) >= 3 and parts[2] else None
+        return vendor_id, code_verifier
 
     async def build_authorization_url(self, vendor_id: int) -> str:
         vendor = await self.vendors.get_by_id(vendor_id)
@@ -55,36 +80,29 @@ class GoogleOAuthService:
             raise ResourceNotFoundError("Vendor not found")
 
         flow = self._build_flow()
-        oauth_state = f"{vendor_id}:{secrets.token_hex(16)}"
-        authorization_url, state = flow.authorization_url(
+        flow.autogenerate_code_verifier = True
+        code_verifier = secrets.token_urlsafe(64)[:96]
+        flow.code_verifier = code_verifier
+        oauth_state = self._build_state(vendor_id, code_verifier)
+        authorization_url, _ = flow.authorization_url(
             access_type="offline",
             include_granted_scopes="true",
             prompt="consent",
             state=oauth_state,
         )
 
-        code_verifier = getattr(flow, "code_verifier", None)
-        if code_verifier:
-            self._code_verifiers[state] = code_verifier
         return authorization_url
 
     async def complete_callback(self, code: str, state: str, authorization_response: str) -> int:
         if not code:
             raise ValidationError("Missing authorization code")
-        if not state or ":" not in state:
-            raise ValidationError("Missing vendor state")
 
-        vendor_id_text, _ = state.split(":", 1)
-        try:
-            vendor_id = int(vendor_id_text)
-        except ValueError as exc:
-            raise ValidationError("Invalid vendor state") from exc
+        vendor_id, code_verifier = self._parse_state(state)
 
         if not await self.vendors.get_by_id(vendor_id):
             raise ResourceNotFoundError("Vendor not found")
 
         flow = self._build_flow()
-        code_verifier = self._code_verifiers.pop(state, None)
         if code_verifier:
             flow.code_verifier = code_verifier
 

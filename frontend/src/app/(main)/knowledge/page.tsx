@@ -8,7 +8,7 @@ import {
   fetchCatalogueImportItems,
   fetchCatalogueUploads,
   getApiErrorMessage,
-  importCatalogueItem,
+  importCatalogueItems,
   uploadCatalogue,
 } from "@/lib/api";
 
@@ -31,6 +31,7 @@ type CatalogueItem = {
   id: number;
   upload_id: number;
   name: string;
+  description?: string | null;
   price: number | null;
   currency: string;
   in_stock: boolean;
@@ -80,12 +81,14 @@ export default function KnowledgePage() {
   const [items, setItems] = useState<BusinessInfo[]>([]);
   const [uploads, setUploads] = useState<CatalogueUpload[]>([]);
   const [draftItems, setDraftItems] = useState<CatalogueItem[]>([]);
+  const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
   const [selectedUploadId, setSelectedUploadId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newInfo, setNewInfo] = useState({ title: "", content: "" });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
@@ -178,20 +181,64 @@ export default function KnowledgePage() {
       setSelectedUploadId(uploadId);
       const data = await fetchCatalogueImportItems(credentials.vendorId, credentials.token, uploadId);
       setDraftItems(data);
+      setSelectedDraftIds(new Set(data.filter((item: CatalogueItem) => !item.product_id).map((item: CatalogueItem) => item.id)));
       setError("");
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to load catalogue items"));
     }
   }
 
-  async function handleImport(itemId: number) {
+  function updateDraftItem(itemId: number, patch: Partial<CatalogueItem>) {
+    setDraftItems(current => current.map(item => (item.id === itemId ? { ...item, ...patch } : item)));
+  }
+
+  function toggleDraftSelection(itemId: number) {
+    setSelectedDraftIds(current => {
+      const next = new Set(current);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  }
+
+  function toggleAllDrafts() {
+    const importableIds = draftItems.filter(item => !item.product_id).map(item => item.id);
+    setSelectedDraftIds(current => {
+      if (importableIds.every(id => current.has(id))) return new Set();
+      return new Set(importableIds);
+    });
+  }
+
+  async function handleImportSelected() {
     try {
       const credentials = await auth();
       if (!credentials) return;
-      await importCatalogueItem(credentials.vendorId, credentials.token, itemId);
+      const selectedItems = draftItems.filter(item => selectedDraftIds.has(item.id) && !item.product_id);
+      if (selectedItems.length === 0) return;
+
+      const invalidItem = selectedItems.find(item => !item.name.trim() || item.price === null || Number.isNaN(Number(item.price)) || Number(item.price) <= 0);
+      if (invalidItem) {
+        setError("Every selected product needs a name and valid price before import.");
+        return;
+      }
+
+      setImporting(true);
+      await importCatalogueItems(credentials.vendorId, credentials.token, selectedItems.map(item => ({
+        id: item.id,
+        name: item.name.trim(),
+        description: item.description || null,
+        price: Number(item.price),
+        currency: item.currency || "NGN",
+        in_stock: item.in_stock,
+      })));
       if (selectedUploadId) await selectUpload(selectedUploadId);
     } catch (err) {
-      setError(getApiErrorMessage(err, "Failed to import catalogue item"));
+      setError(getApiErrorMessage(err, "Failed to import catalogue items"));
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -200,6 +247,9 @@ export default function KnowledgePage() {
     if (!term) return true;
     return item.title.toLowerCase().includes(term) || item.content.toLowerCase().includes(term);
   });
+  const importableDrafts = draftItems.filter(item => !item.product_id);
+  const selectedDrafts = draftItems.filter(item => selectedDraftIds.has(item.id) && !item.product_id);
+  const allDraftsSelected = importableDrafts.length > 0 && importableDrafts.every(item => selectedDraftIds.has(item.id));
 
   if (loading) {
     return (
@@ -281,8 +331,29 @@ export default function KnowledgePage() {
           {selectedUploadId && (
             <div className="mt-5 border border-gray-100 rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
-                <p className="text-[13px] font-bold text-gray-900">Parsed draft products</p>
-                <p className="text-[11px] font-bold text-gray-400">{draftItems.length} items</p>
+                <div>
+                  <p className="text-[13px] font-bold text-gray-900">Parsed draft products</p>
+                  <p className="text-[11px] font-bold text-gray-400">{selectedDrafts.length} of {importableDrafts.length} importable selected</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleAllDrafts}
+                    disabled={importableDrafts.length === 0}
+                    className="text-[12px] font-bold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white"
+                  >
+                    {allDraftsSelected ? "Unselect all" : "Select all"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleImportSelected}
+                    disabled={importing || selectedDrafts.length === 0}
+                    className="text-[12px] font-bold px-3 py-2 rounded-lg bg-gray-900 text-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    {importing ? <Loader2 size={13} className="animate-spin" /> : <PackageCheck size={13} />}
+                    Import selected
+                  </button>
+                </div>
               </div>
               {draftItems.length === 0 ? (
                 <div className="py-8 text-center">
@@ -292,28 +363,58 @@ export default function KnowledgePage() {
                 <div className="divide-y divide-gray-100">
                   {draftItems.map(item => (
                     <div key={item.id} className="grid grid-cols-12 items-center px-4 py-3">
-                      <div className="col-span-6 min-w-0">
-                        <p className="text-[13px] font-semibold text-gray-900 truncate">{item.name}</p>
+                      <div className="col-span-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedDraftIds.has(item.id)}
+                          onChange={() => toggleDraftSelection(item.id)}
+                          disabled={Boolean(item.product_id)}
+                          className="h-4 w-4 accent-[#059669] disabled:opacity-40"
+                          aria-label={`Select ${item.name}`}
+                        />
+                      </div>
+                      <div className="col-span-5 min-w-0 pr-3">
+                        <input
+                          value={item.name}
+                          onChange={event => updateDraftItem(item.id, { name: event.target.value })}
+                          disabled={Boolean(item.product_id)}
+                          className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-[13px] font-semibold text-gray-900 truncate focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
+                          title="Double-click or focus to edit product name"
+                        />
                         <p className="text-[11px] text-gray-400 font-medium truncate">{item.raw_text || "No raw text"}</p>
                       </div>
-                      <div className="col-span-2 text-right text-[12px] font-bold font-mono text-gray-900">
-                        {item.price === null ? "No price" : `${item.currency} ${item.price.toLocaleString()}`}
+                      <div className="col-span-2 flex items-center justify-end gap-1">
+                        <input
+                          value={item.currency}
+                          onChange={event => updateDraftItem(item.id, { currency: event.target.value.toUpperCase().slice(0, 3) })}
+                          disabled={Boolean(item.product_id)}
+                          className="w-12 bg-transparent border border-transparent rounded-lg px-1 py-1 text-right text-[12px] font-bold font-mono text-gray-700 focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
+                          title="Double-click or focus to edit currency"
+                        />
+                        <input
+                          type="number"
+                          value={item.price ?? ""}
+                          onChange={event => updateDraftItem(item.id, { price: event.target.value === "" ? null : Number(event.target.value) })}
+                          disabled={Boolean(item.product_id)}
+                          className="w-24 bg-transparent border border-transparent rounded-lg px-1 py-1 text-right text-[12px] font-bold font-mono text-gray-900 focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
+                          placeholder="No price"
+                          title="Double-click or focus to edit price"
+                        />
                       </div>
                       <div className="col-span-2 text-center">
                         <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${item.in_stock ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                          {item.status}
+                          {item.product_id ? "IMPORTED" : item.status}
                         </span>
                       </div>
-                      <div className="col-span-2 flex justify-end">
-                        <button
-                          type="button"
-                          disabled={Boolean(item.product_id) || item.price === null}
-                          onClick={() => handleImport(item.id)}
-                          className="text-[12px] font-bold px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5"
-                        >
-                          <PackageCheck size={13} />
-                          {item.product_id ? "Imported" : "Import"}
-                        </button>
+                      <div className="col-span-2">
+                        <input
+                          value={item.description || ""}
+                          onChange={event => updateDraftItem(item.id, { description: event.target.value })}
+                          disabled={Boolean(item.product_id)}
+                          className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-[12px] font-medium text-gray-500 truncate focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
+                          placeholder="Description"
+                          title="Double-click or focus to edit description"
+                        />
                       </div>
                     </div>
                   ))}

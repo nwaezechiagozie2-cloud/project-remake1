@@ -8,6 +8,7 @@ from app.api.deps import (
     get_auth_service,
     get_business_info_repo,
     get_catalogue_repo,
+    get_google_token_repo,
     get_product_repo,
     get_settings_repo,
     get_vendor_repo,
@@ -16,6 +17,7 @@ from app.exceptions import AuthorizationError, ResourceNotFoundError, Validation
 from app.schemas.api import (
     BusinessInfoCreateRequest,
     BusinessInfoResponse,
+    CatalogueBulkImportRequest,
     CatalogueImportItemResponse,
     CatalogueUploadCreateRequest,
     CatalogueUploadResponse,
@@ -240,10 +242,26 @@ async def import_catalogue_item(vendor_id: int, item_id: int, vendors=Depends(ge
     return product
 
 
+@router.post("/{vendor_id}/catalogue/items/import-bulk", dependencies=[Depends(_authorize_vendor_scope)], status_code=201, response_model=list[ProductResponse])
+async def import_catalogue_items(vendor_id: int, payload: CatalogueBulkImportRequest, vendors=Depends(get_vendor_repo), catalogue=Depends(get_catalogue_repo)) -> list[dict]:
+    await _ensure_vendor(vendor_id, vendors)
+    products = await catalogue.import_items_as_products(vendor_id, [item.model_dump(mode="json") for item in payload.items])
+    if not products:
+        raise ResourceNotFoundError("No catalogue items were imported")
+    return products
+
+
 @router.get("/{vendor_id}/business-info", dependencies=[Depends(_authorize_vendor_scope)], response_model=list[BusinessInfoResponse])
 async def list_business_info(vendor_id: int, vendors=Depends(get_vendor_repo), business_info=Depends(get_business_info_repo)) -> list[dict]:
     await _ensure_vendor(vendor_id, vendors)
     return await business_info.list_for_vendor(vendor_id)
+
+
+@router.delete("/{vendor_id}/google-contacts", dependencies=[Depends(_authorize_vendor_scope)], response_model=DeleteResponse)
+async def disconnect_google_contacts(vendor_id: int, vendors=Depends(get_vendor_repo), google_tokens=Depends(get_google_token_repo)) -> DeleteResponse:
+    await _ensure_vendor(vendor_id, vendors)
+    await google_tokens.delete_for_vendor(vendor_id)
+    return DeleteResponse(status="deleted")
 
 
 @router.post("/{vendor_id}/business-info", dependencies=[Depends(_authorize_vendor_scope)], status_code=201, response_model=BusinessInfoResponse)

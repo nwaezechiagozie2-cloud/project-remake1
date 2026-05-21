@@ -1,15 +1,24 @@
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 import logging
 
-from app.api.deps import get_auth_service, get_google_oauth_service, get_instagram_oauth_service
+from app.api.deps import get_auth_service, get_google_oauth_service, get_instagram_oauth_service, get_oauth_login_service
 from app.exceptions import ValidationError
 from app.observability import get_metrics_registry
-from app.schemas.api import AuthResponse, ErrorResponse, GoogleOAuthStatusResponse, VendorLoginRequest, VendorRegisterRequest
+from app.schemas.api import (
+    AuthResponse,
+    EmailVerificationConfirmRequest,
+    EmailVerificationRequest,
+    ErrorResponse,
+    GoogleOAuthStatusResponse,
+    VendorLoginRequest,
+    VendorRegisterRequest,
+)
 from app.security import rate_limit_dependency
 from app.services.auth_service import AuthService
 from app.services.google_oauth_service import GoogleOAuthService
 from app.services.instagram_oauth_service import InstagramOAuthService
+from app.services.oauth_login_service import OAuthLoginService
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +56,7 @@ router = APIRouter(tags=["auth"], responses=STANDARD_ERROR_RESPONSES)
 
 @router.post("/auth/register", response_model=AuthResponse, status_code=201, dependencies=[Depends(rate_limit_dependency(scope="auth"))])
 async def register(payload: VendorRegisterRequest, auth_service: AuthService = Depends(get_auth_service)) -> dict:
-    result = await auth_service.register(name=payload.name, email=payload.email, password=payload.password)
+    result = await auth_service.register(email=payload.email, password=payload.password)
     logger.info("auth_register_succeeded | vendor_id=%s", result.get("vendor_id"))
     return result
 
@@ -57,6 +66,69 @@ async def login(payload: VendorLoginRequest, auth_service: AuthService = Depends
     result = await auth_service.login(email=payload.email, password=payload.password)
     logger.info("auth_login_succeeded | vendor_id=%s", result.get("vendor_id"))
     return result
+
+
+@router.post("/auth/verify-email/request", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
+async def request_email_verification(payload: EmailVerificationRequest, auth_service: AuthService = Depends(get_auth_service)) -> dict:
+    result = await auth_service.request_registration_verification(payload.email)
+    logger.info("email_verification_requested | email=%s", payload.email)
+    return result
+
+
+@router.post("/auth/verify-email/confirm", response_model=dict, dependencies=[Depends(rate_limit_dependency(scope="auth"))])
+async def confirm_email_verification(payload: EmailVerificationConfirmRequest, auth_service: AuthService = Depends(get_auth_service)) -> dict:
+    result = await auth_service.confirm_registration_email(payload.token)
+    logger.info("email_verification_confirmed | vendor_id=%s", result.get("vendor_id"))
+    return result
+
+
+@router.get("/auth/login/google", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
+async def login_google(oauth_login: OAuthLoginService = Depends(get_oauth_login_service)):
+    authorization_url = await oauth_login.build_google_url()
+    logger.info("google_login_authorization_redirect")
+    return RedirectResponse(url=authorization_url)
+
+
+@router.get("/auth/login/google/callback")
+async def login_google_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    oauth_login: OAuthLoginService = Depends(get_oauth_login_service),
+):
+    if error:
+        raise ValidationError("Google login failed", details={"error": error})
+    if not code or not state:
+        raise ValidationError("Missing Google login callback parameters")
+    frontend_url = await oauth_login.complete_google(code=code, state=state)
+    get_metrics_registry().increment("oauth_callbacks_total")
+    logger.info("google_login_callback_completed")
+    return RedirectResponse(url=frontend_url)
+
+
+@router.get("/auth/login/instagram", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
+async def login_instagram(oauth_login: OAuthLoginService = Depends(get_oauth_login_service)):
+    authorization_url = await oauth_login.build_instagram_url()
+    logger.info("instagram_login_authorization_redirect")
+    return RedirectResponse(url=authorization_url)
+
+
+@router.get("/auth/login/instagram/callback")
+async def login_instagram_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    error_description: str | None = None,
+    oauth_login: OAuthLoginService = Depends(get_oauth_login_service),
+):
+    if error:
+        raise ValidationError("Instagram login failed", details={"error": error, "description": error_description})
+    if not code or not state:
+        raise ValidationError("Missing Instagram login callback parameters")
+    frontend_url = await oauth_login.complete_instagram(code=code, state=state)
+    get_metrics_registry().increment("oauth_callbacks_total")
+    logger.info("instagram_login_callback_completed")
+    return RedirectResponse(url=frontend_url)
 
 
 @router.get("/auth/google", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
@@ -79,7 +151,7 @@ async def auth_google_callback(
     code: str | None = None,
     state: str | None = None,
     oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),
-) -> HTMLResponse:
+) -> RedirectResponse:
     if not code or not state:
         raise ValidationError("Missing OAuth callback parameters")
 
@@ -91,14 +163,7 @@ async def auth_google_callback(
     get_metrics_registry().increment("oauth_callbacks_total")
     logger.info("google_oauth_callback_completed | vendor_id=%s", vendor_id)
 
-    return HTMLResponse(
-        content=(
-            "<html><body><h3>Google OAuth completed successfully.</h3>"
-            f"<p>Token saved for vendor <code>{vendor_id}</code>.</p>"
-            "<p>You can close this tab now.</p>"
-            "</body></html>"
-        )
-    )
+    return RedirectResponse(url=f"{oauth_service.settings.frontend_base_url.rstrip('/')}/settings?google=connected")
 
 
 @router.get("/auth/instagram", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
@@ -116,7 +181,7 @@ async def auth_instagram_callback(
     error: str | None = None,
     error_description: str | None = None,
     oauth_service: InstagramOAuthService = Depends(get_instagram_oauth_service),
-) -> HTMLResponse:
+) -> RedirectResponse:
     if error:
         raise ValidationError("Instagram OAuth failed", details={"error": error, "description": error_description})
     if not code or not state:
@@ -126,12 +191,4 @@ async def auth_instagram_callback(
     get_metrics_registry().increment("oauth_callbacks_total")
     logger.info("instagram_oauth_callback_completed | vendor_id=%s", result["vendor_id"])
 
-    username = result.get("username") or result["instagram_page_id"]
-    return HTMLResponse(
-        content=(
-            "<html><body><h3>Instagram OAuth completed successfully.</h3>"
-            f"<p>Connected Instagram account <code>{username}</code> for vendor <code>{result['vendor_id']}</code>.</p>"
-            "<p>You can close this tab now.</p>"
-            "</body></html>"
-        )
-    )
+    return RedirectResponse(url=f"{oauth_service.settings.frontend_base_url.rstrip('/')}/settings?instagram=connected")

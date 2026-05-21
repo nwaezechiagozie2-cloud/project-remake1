@@ -26,7 +26,6 @@ class VendorRegisterRequest(BaseModel):
     )
 
 
-    name: str = Field(min_length=2, max_length=255)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
 
@@ -57,6 +56,43 @@ class AuthResponse(BaseModel):
 
     vendor_id: int
     token: str
+    email_verified: bool | None = None
+    email_verification: dict[str, Any] | None = None
+
+
+class EmailVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class EmailVerificationConfirmRequest(BaseModel):
+    token: str = Field(min_length=16)
+
+
+class EmailChangeRequest(BaseModel):
+    new_email: EmailStr
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class VendorProfileAuthResponse(BaseModel):
+    vendor_id: int
+    name: str
+    email: str
+    email_verified: bool
+    email_verified_at: datetime | None = None
+    pending_email: str | None = None
+    providers: dict[str, bool] = Field(default_factory=dict)
+
+
+class VendorProfileUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+
+class StatusResponse(BaseModel):
+    status: str
 
 
 class GoogleOAuthStatusResponse(BaseModel):
@@ -234,6 +270,19 @@ class CatalogueImportItemResponse(BaseModel):
     status: str
     product_id: int | None = None
     created_at: datetime
+
+
+class CatalogueBulkImportItemRequest(BaseModel):
+    id: int
+    name: str = Field(min_length=2, max_length=255)
+    description: str | None = None
+    price: float = Field(ge=0.01, le=100_000_000)
+    currency: str = Field(default="NGN", pattern=r"^[A-Z]{3}$", min_length=3, max_length=3)
+    in_stock: bool = True
+
+
+class CatalogueBulkImportRequest(BaseModel):
+    items: list[CatalogueBulkImportItemRequest] = Field(min_length=1)
 
 
 class VendorProfileResponse(BaseModel):
