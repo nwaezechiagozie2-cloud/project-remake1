@@ -194,8 +194,6 @@ class VendorSettingsUpdateRequest(BaseModel):
             "example": {
                 "confirm_before_sending_account_details": True,
                 "enable_knowledge_base_answers": True,
-                "allow_product_qa": True,
-                "allow_office_qa": True,
                 "use_product_availability": True,
             }
         }
@@ -203,16 +201,12 @@ class VendorSettingsUpdateRequest(BaseModel):
 
     confirm_before_sending_account_details: bool | None = None
     enable_knowledge_base_answers: bool | None = None
-    allow_product_qa: bool | None = None
-    allow_office_qa: bool | None = None
     use_product_availability: bool | None = None
 
 
 class VendorSettingsResponse(BaseModel):
     confirm_before_sending_account_details: bool
     enable_knowledge_base_answers: bool
-    allow_product_qa: bool
-    allow_office_qa: bool
     use_product_availability: bool
 
 

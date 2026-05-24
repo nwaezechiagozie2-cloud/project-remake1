@@ -52,8 +52,6 @@ class VendorBotSetting(Base):
     vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), primary_key=True)
     confirm_before_sending_account_details: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     enable_knowledge_base_answers: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
-    allow_product_qa: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
-    allow_office_qa: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     use_product_availability: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

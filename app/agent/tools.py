@@ -38,7 +38,10 @@ def create_agent_tools(
     _vendor_dict = vendor_dict
     _vendor_settings = vendor_settings
 
-    return [search_products, search_business_info, get_store_catalogue, request_bank_details_and_vendor_approval]
+    tools = [search_products, get_store_catalogue, request_bank_details_and_vendor_approval]
+    if (vendor_settings or {}).get("enable_knowledge_base_answers", True):
+        tools.insert(1, search_business_info)
+    return tools
 
 
 @tool
@@ -86,10 +89,6 @@ async def search_business_info(query: str) -> str:
     IMPORTANT: Provide 1-2 simple keywords as the query (e.g. 'delivery'), NOT the full question."""
     if not _business_info_repo or not _vendor_id:
         return "No business information available."
-
-    settings = _vendor_settings or {}
-    if not settings.get("enable_knowledge_base_answers", True):
-        return "Business info search is disabled for this store."
 
     content = await _business_info_repo.search(_vendor_id, query)
     if content:

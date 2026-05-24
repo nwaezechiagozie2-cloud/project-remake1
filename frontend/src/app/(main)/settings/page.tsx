@@ -23,8 +23,6 @@ import { GoogleIcon, InstagramIcon } from "@/components/brand-icons";
 const defaultSettings: VendorBotSettings = {
   confirm_before_sending_account_details: false,
   enable_knowledge_base_answers: true,
-  allow_product_qa: true,
-  allow_office_qa: true,
   use_product_availability: true,
 };
 
@@ -34,17 +32,7 @@ const settingRows: { key: SettingKey; label: string; desc: string }[] = [
   {
     key: "enable_knowledge_base_answers",
     label: "Business Info Answers",
-    desc: "Allow the bot to answer delivery, returns, location, and policy questions.",
-  },
-  {
-    key: "allow_product_qa",
-    label: "Product Q&A",
-    desc: "Allow the bot to answer specific product and price questions.",
-  },
-  {
-    key: "allow_office_qa",
-    label: "Office & Store Q&A",
-    desc: "Allow the bot to answer store-hours and location questions.",
+    desc: "Allow the bot to answer delivery, returns, location, and policy questions using your business info.",
   },
   {
     key: "use_product_availability",
@@ -54,7 +42,7 @@ const settingRows: { key: SettingKey; label: string; desc: string }[] = [
   {
     key: "confirm_before_sending_account_details",
     label: "Confirm Before Bank Details",
-    desc: "Require vendor approval before payment details are sent.",
+    desc: "Require your approval before payment details are sent. When off, the bot sends them automatically once a customer asks to pay.",
   },
 ];
 

@@ -738,15 +738,11 @@ class SQLVendorSettingsRepository:
                 return {
                     "confirm_before_sending_account_details": False,
                     "enable_knowledge_base_answers": True,
-                    "allow_product_qa": True,
-                    "allow_office_qa": True,
                     "use_product_availability": True,
                 }
             return {
                 "confirm_before_sending_account_details": bool(row.confirm_before_sending_account_details),
                 "enable_knowledge_base_answers": bool(row.enable_knowledge_base_answers),
-                "allow_product_qa": bool(row.allow_product_qa),
-                "allow_office_qa": bool(row.allow_office_qa),
                 "use_product_availability": bool(row.use_product_availability),
             }
 
@@ -762,8 +758,6 @@ class SQLVendorSettingsRepository:
             return {
                 "confirm_before_sending_account_details": bool(row.confirm_before_sending_account_details),
                 "enable_knowledge_base_answers": bool(row.enable_knowledge_base_answers),
-                "allow_product_qa": bool(row.allow_product_qa),
-                "allow_office_qa": bool(row.allow_office_qa),
                 "use_product_availability": bool(row.use_product_availability),
             }
 

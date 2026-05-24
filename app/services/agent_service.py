@@ -105,13 +105,32 @@ class AgentService:
             )
 
             if result["order_status"] == "WAITING_VENDOR_CHECKOUT_APPROVAL":
-                decision.vendor_text = f"Customer {message.from_number} wants to make a purchase. Approve checkout?"
-                decision.vendor_buttons = [
-                    {"id": f"btn_approve::{message.from_number}", "title": "✅ YES"},
-                    {"id": f"btn_deny::{message.from_number}", "title": "❌ NO"},
-                ]
-            
+                confirm = bool(vendor_settings.get("confirm_before_sending_account_details", False))
+                if confirm:
+                    decision.vendor_text = f"Customer {message.from_number} wants to make a purchase. Approve checkout?"
+                    decision.vendor_buttons = [
+                        {"id": f"btn_approve::{message.from_number}", "title": "✅ YES"},
+                        {"id": f"btn_deny::{message.from_number}", "title": "❌ NO"},
+                    ]
+                else:
+                    decision.customer_text = self._build_payment_message(vendor)
+                    decision.order_status = "ACCOUNT_DETAILS_SENT"
+                    decision.vendor_text = f"Customer {message.from_number} requested checkout — bank details sent automatically."
+
             return decision
+
+    @staticmethod
+    def _build_payment_message(vendor: dict) -> str:
+        bank = vendor.get("bank_name") or ""
+        name = vendor.get("account_name") or ""
+        acct = vendor.get("account_number") or ""
+        if bank and acct:
+            return (
+                "Your order has been approved. Here are the account details:\n\n"
+                f"Bank: {bank}\nAccount Name: {name}\nAccount Number: {acct}\n\n"
+                "Please share the payment receipt once you've made the transfer!"
+            )
+        return "Your order has been approved! I'll share the account details with you in a moment."
 
     async def _handle_vendor_button(self, vendor: dict, text: str) -> AgentDecision:
         """Handle vendor button taps (approve/deny). Pure system logic, no AI needed."""
@@ -126,14 +145,7 @@ class AgentService:
             if not customer_target:
                 return AgentDecision(vendor_text="Could not identify the customer.", order_status="VENDOR_RESPONSE")
 
-            bank = vendor.get("bank_name") or ""
-            name = vendor.get("account_name") or ""
-            acct = vendor.get("account_number") or ""
-
-            if bank and acct:
-                payment_msg = f"Your order has been approved. Here are the account details:\n\nBank: {bank}\nAccount Name: {name}\nAccount Number: {acct}\n\nPlease share the payment receipt once you've made the transfer!"
-            else:
-                payment_msg = "Your order has been approved! I'll share the account details with you in a moment."
+            payment_msg = self._build_payment_message(vendor)
 
             return AgentDecision(
                 customer_text=payment_msg,

@@ -26,8 +26,6 @@ export type ProductPayload = {
 export type VendorBotSettings = {
   confirm_before_sending_account_details: boolean;
   enable_knowledge_base_answers: boolean;
-  allow_product_qa: boolean;
-  allow_office_qa: boolean;
   use_product_availability: boolean;
 };
 
