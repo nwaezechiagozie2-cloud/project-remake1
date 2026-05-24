@@ -21,7 +21,7 @@ class AgentState(TypedDict):
     order_status: str
 
 
-SYSTEM_PROMPT = (
+SYSTEM_PROMPT_BASE = (
     "You are a helpful Sales Assistant, a production-grade autonomous agent for an o store. "
     "Your goal is to be helpful, professional, and efficient. Write plain text (no markdown).\n\n"
     "Core Principles:\n"
@@ -31,12 +31,31 @@ SYSTEM_PROMPT = (
     "- Be nice to customers-\n\n"
     "Operational Rules:\n"
     "- If a product is missing, say its not available.\n"
-    "- Use search_products to search for items and search_business_info for store policies, delivery info, location, and other business details.\n"
+)
+
+SYSTEM_PROMPT_CHECKOUT_RULES = (
     "- CRITICAL FORBIDDEN ACTION: Never call the request_bank_details_and_vendor_approval tool just because a customer says they 'want' to buy, are 'interested', or 'will take' a product. These are still inquiries.\n"
     "- ONLY CALL request_bank_details_and_vendor_approval when the customer explicitly asks 'How do I pay?', 'What is your account number?', or says 'I am ready to transfer the money now'.\n"
     "- If they just say they want to buy, provide product info and ask: 'Do you want to pay so I can send the details?'\n"
     "- Once you call request_bank_details_and_vendor_approval, tell the customer that the store is being notified to approve the order."
 )
+
+
+def build_system_prompt(vendor_settings: dict | None) -> str:
+    enable_kb = (vendor_settings or {}).get("enable_knowledge_base_answers", True)
+    if enable_kb:
+        tools_line = (
+            "- Use search_products to search for items and search_business_info for store policies, "
+            "delivery info, location, and other business details.\n"
+        )
+    else:
+        tools_line = (
+            "- Use search_products to search for items. "
+            "You do not have access to any business-info, policy, delivery, or store-hours data — "
+            "if a customer asks about those topics, tell them the store hasn't published that info "
+            "and offer to share what you do know about products.\n"
+        )
+    return SYSTEM_PROMPT_BASE + tools_line + SYSTEM_PROMPT_CHECKOUT_RULES
 
 
 def get_chat_providers(settings: Settings, tools: list = None):
@@ -99,7 +118,7 @@ def create_nodes():
         if len(all_messages) > 10:
             all_messages = all_messages[-10:]
 
-        prompt = [SystemMessage(content=SYSTEM_PROMPT)] + all_messages
+        prompt = [SystemMessage(content=build_system_prompt(config["configurable"].get("vendor_settings")))] + all_messages
         
         import asyncio
         last_error = None

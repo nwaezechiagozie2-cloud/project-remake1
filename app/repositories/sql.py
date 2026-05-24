@@ -755,6 +755,7 @@ class SQLVendorSettingsRepository:
             for key, value in payload.items():
                 setattr(row, key, value)
             await session.flush()
+            await session.refresh(row)
             return {
                 "confirm_before_sending_account_details": bool(row.confirm_before_sending_account_details),
                 "enable_knowledge_base_answers": bool(row.enable_knowledge_base_answers),

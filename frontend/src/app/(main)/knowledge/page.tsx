@@ -1,15 +1,11 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Search, Trash2, FileText, Globe, MessageSquare, Loader2, Plus, X, Upload, PackageCheck } from "lucide-react";
+import { Search, Trash2, FileText, Globe, MessageSquare, Loader2, Plus, X, Upload } from "lucide-react";
 import {
   createBusinessInfo,
   deleteBusinessInfo,
   fetchBusinessInfo,
-  fetchCatalogueImportItems,
-  fetchCatalogueUploads,
   getApiErrorMessage,
-  importCatalogueItems,
-  uploadCatalogue,
 } from "@/lib/api";
 
 type BusinessInfo = {
@@ -19,42 +15,22 @@ type BusinessInfo = {
   source_type: string;
 };
 
-type CatalogueUpload = {
-  id: number;
-  file_name: string;
-  status: string;
-  error_message?: string | null;
-  created_at: string;
-};
-
-type CatalogueItem = {
-  id: number;
-  upload_id: number;
-  name: string;
-  description?: string | null;
-  price: number | null;
-  currency: string;
-  in_stock: boolean;
-  raw_text?: string | null;
-  status: string;
-  product_id?: number | null;
-};
+const TEXT_FILE_EXTS = [".txt", ".csv", ".md", ".markdown"];
+const TEXT_FILE_MIMES = ["text/plain", "text/csv", "text/markdown"];
 
 function TopicIcon({ type }: { type: string }) {
   let hue = 210;
   let Icon = FileText;
-
   if (type === "TEXT") {
     hue = 160;
     Icon = MessageSquare;
-  } else if (type === "PDF" || type === "CATALOGUE") {
+  } else if (type === "PDF") {
     hue = 280;
     Icon = FileText;
   } else {
     hue = 30;
     Icon = Globe;
   }
-
   return (
     <span
       className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm"
@@ -65,34 +41,17 @@ function TopicIcon({ type }: { type: string }) {
   );
 }
 
-function fileToBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      resolve(result.includes(",") ? result.split(",", 2)[1] : result);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function KnowledgePage() {
   const [items, setItems] = useState<BusinessInfo[]>([]);
-  const [uploads, setUploads] = useState<CatalogueUpload[]>([]);
-  const [draftItems, setDraftItems] = useState<CatalogueItem[]>([]);
-  const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
-  const [selectedUploadId, setSelectedUploadId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newInfo, setNewInfo] = useState({ title: "", content: "" });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
-  const auth = useCallback(async () => {
+  const auth = useCallback(() => {
     const vendorId = localStorage.getItem("otc_vendor_id");
     const token = localStorage.getItem("otc_token");
     if (!vendorId || !token) return null;
@@ -100,18 +59,14 @@ export default function KnowledgePage() {
   }, []);
 
   const loadData = useCallback(async () => {
+    const credentials = auth();
+    if (!credentials) return;
     try {
-      const credentials = await auth();
-      if (!credentials) return;
-      const [businessInfo, catalogueUploads] = await Promise.all([
-        fetchBusinessInfo(credentials.vendorId, credentials.token),
-        fetchCatalogueUploads(credentials.vendorId, credentials.token),
-      ]);
+      const businessInfo = await fetchBusinessInfo(credentials.vendorId, credentials.token);
       setItems(businessInfo);
-      setUploads(catalogueUploads);
       setError("");
     } catch (err) {
-      setError(getApiErrorMessage(err, "Failed to load knowledge data"));
+      setError(getApiErrorMessage(err, "Failed to load business info"));
     } finally {
       setLoading(false);
     }
@@ -123,10 +78,10 @@ export default function KnowledgePage() {
 
   async function handleAdd() {
     if (!newInfo.title || !newInfo.content) return;
+    const credentials = auth();
+    if (!credentials) return;
     setSaving(true);
     try {
-      const credentials = await auth();
-      if (!credentials) return;
       await createBusinessInfo(credentials.vendorId, credentials.token, { ...newInfo, source_type: "TEXT" });
       setNewInfo({ title: "", content: "" });
       setShowAddModal(false);
@@ -140,9 +95,9 @@ export default function KnowledgePage() {
 
   async function handleDelete(id: number) {
     if (!confirm("Delete this information? The AI will no longer be able to use it.")) return;
+    const credentials = auth();
+    if (!credentials) return;
     try {
-      const credentials = await auth();
-      if (!credentials) return;
       await deleteBusinessInfo(credentials.vendorId, credentials.token, id);
       await loadData();
     } catch (err) {
@@ -150,95 +105,43 @@ export default function KnowledgePage() {
     }
   }
 
-  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
+    const lowerName = file.name.toLowerCase();
+    const looksTextual =
+      TEXT_FILE_MIMES.includes(file.type) ||
+      TEXT_FILE_EXTS.some(ext => lowerName.endsWith(ext));
+
+    if (!looksTextual) {
+      setError("Only .txt, .csv, or .md files are supported here for now. For PDFs, paste the text content via Add information.");
+      return;
+    }
+
+    const credentials = auth();
+    if (!credentials) return;
+
     setUploading(true);
     try {
-      const credentials = await auth();
-      if (!credentials) return;
-      const contentBase64 = await fileToBase64(file);
-      const upload = await uploadCatalogue(credentials.vendorId, credentials.token, {
-        file_name: file.name,
-        mime_type: file.type || "text/plain",
-        content_base64: contentBase64,
-      });
-      await loadData();
-      await selectUpload(upload.id);
-    } catch (err) {
-      setError(getApiErrorMessage(err, "Failed to upload catalogue"));
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function selectUpload(uploadId: number) {
-    try {
-      const credentials = await auth();
-      if (!credentials) return;
-      setSelectedUploadId(uploadId);
-      const data = await fetchCatalogueImportItems(credentials.vendorId, credentials.token, uploadId);
-      setDraftItems(data);
-      setSelectedDraftIds(new Set(data.filter((item: CatalogueItem) => !item.product_id).map((item: CatalogueItem) => item.id)));
-      setError("");
-    } catch (err) {
-      setError(getApiErrorMessage(err, "Failed to load catalogue items"));
-    }
-  }
-
-  function updateDraftItem(itemId: number, patch: Partial<CatalogueItem>) {
-    setDraftItems(current => current.map(item => (item.id === itemId ? { ...item, ...patch } : item)));
-  }
-
-  function toggleDraftSelection(itemId: number) {
-    setSelectedDraftIds(current => {
-      const next = new Set(current);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-      return next;
-    });
-  }
-
-  function toggleAllDrafts() {
-    const importableIds = draftItems.filter(item => !item.product_id).map(item => item.id);
-    setSelectedDraftIds(current => {
-      if (importableIds.every(id => current.has(id))) return new Set();
-      return new Set(importableIds);
-    });
-  }
-
-  async function handleImportSelected() {
-    try {
-      const credentials = await auth();
-      if (!credentials) return;
-      const selectedItems = draftItems.filter(item => selectedDraftIds.has(item.id) && !item.product_id);
-      if (selectedItems.length === 0) return;
-
-      const invalidItem = selectedItems.find(item => !item.name.trim() || item.price === null || Number.isNaN(Number(item.price)) || Number(item.price) <= 0);
-      if (invalidItem) {
-        setError("Every selected product needs a name and valid price before import.");
+      const text = await file.text();
+      const trimmed = text.trim();
+      if (!trimmed) {
+        setError("That file was empty.");
         return;
       }
-
-      setImporting(true);
-      await importCatalogueItems(credentials.vendorId, credentials.token, selectedItems.map(item => ({
-        id: item.id,
-        name: item.name.trim(),
-        description: item.description || null,
-        price: Number(item.price),
-        currency: item.currency || "NGN",
-        in_stock: item.in_stock,
-      })));
-      if (selectedUploadId) await selectUpload(selectedUploadId);
+      const title = file.name.replace(/\.[^.]+$/, "") || "Untitled";
+      await createBusinessInfo(credentials.vendorId, credentials.token, {
+        title,
+        content: trimmed,
+        source_type: "TEXT",
+      });
+      await loadData();
     } catch (err) {
-      setError(getApiErrorMessage(err, "Failed to import catalogue items"));
+      setError(getApiErrorMessage(err, "Failed to upload file"));
     } finally {
-      setImporting(false);
+      setUploading(false);
     }
   }
 
@@ -247,9 +150,6 @@ export default function KnowledgePage() {
     if (!term) return true;
     return item.title.toLowerCase().includes(term) || item.content.toLowerCase().includes(term);
   });
-  const importableDrafts = draftItems.filter(item => !item.product_id);
-  const selectedDrafts = draftItems.filter(item => selectedDraftIds.has(item.id) && !item.product_id);
-  const allDraftsSelected = importableDrafts.length > 0 && importableDrafts.every(item => selectedDraftIds.has(item.id));
 
   if (loading) {
     return (
@@ -271,12 +171,12 @@ export default function KnowledgePage() {
           <div className="flex items-center gap-2">
             <label className="bg-white border border-gray-100 text-gray-700 text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2 cursor-pointer shadow-sm">
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-              Upload catalogue
+              Upload file
               <input
                 type="file"
-                accept=".txt,.csv,.pdf,.doc,.docx,text/plain,text/csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept=".txt,.csv,.md,.markdown,text/plain,text/csv,text/markdown"
                 className="hidden"
-                onChange={handleUpload}
+                onChange={handleFileUpload}
                 disabled={uploading}
               />
             </label>
@@ -288,141 +188,6 @@ export default function KnowledgePage() {
             </button>
           </div>
         </div>
-
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[14px] font-bold text-gray-900">Catalogue uploads</h2>
-            <p className="text-[12px] font-medium text-gray-400">Review parsed draft products before importing.</p>
-          </div>
-
-          {uploads.length === 0 ? (
-            <div className="py-8 text-center border border-gray-100 rounded-2xl bg-gray-50/40">
-              <p className="text-[13px] text-gray-400 font-medium">No catalogue files uploaded yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {uploads.map(upload => (
-                <button
-                  type="button"
-                  key={upload.id}
-                  onClick={() => selectUpload(upload.id)}
-                  className={`w-full grid grid-cols-12 items-center px-3 py-3 rounded-xl text-left transition-colors border ${
-                    selectedUploadId === upload.id ? "border-emerald-700/30 bg-emerald-50/40" : "border-transparent hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="col-span-7 flex items-center gap-3 min-w-0">
-                    <TopicIcon type="CATALOGUE" />
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-gray-900 truncate">{upload.file_name}</p>
-                      <p className="text-[11px] text-gray-400 font-medium">{new Date(upload.created_at).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <div className="col-span-3">
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">{upload.status}</span>
-                  </div>
-                  <div className="col-span-2 text-right">
-                    <span className="text-[12px] font-bold text-gray-700">Review</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {selectedUploadId && (
-            <div className="mt-5 border border-gray-100 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
-                <div>
-                  <p className="text-[13px] font-bold text-gray-900">Parsed draft products</p>
-                  <p className="text-[11px] font-bold text-gray-400">{selectedDrafts.length} of {importableDrafts.length} importable selected</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={toggleAllDrafts}
-                    disabled={importableDrafts.length === 0}
-                    className="text-[12px] font-bold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white"
-                  >
-                    {allDraftsSelected ? "Unselect all" : "Select all"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleImportSelected}
-                    disabled={importing || selectedDrafts.length === 0}
-                    className="text-[12px] font-bold px-3 py-2 rounded-lg bg-gray-900 text-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5"
-                  >
-                    {importing ? <Loader2 size={13} className="animate-spin" /> : <PackageCheck size={13} />}
-                    Import selected
-                  </button>
-                </div>
-              </div>
-              {draftItems.length === 0 ? (
-                <div className="py-8 text-center">
-                  <p className="text-[13px] text-gray-400 font-medium">No product candidates were parsed from this upload.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {draftItems.map(item => (
-                    <div key={item.id} className="grid grid-cols-12 items-center px-4 py-3">
-                      <div className="col-span-1">
-                        <input
-                          type="checkbox"
-                          checked={selectedDraftIds.has(item.id)}
-                          onChange={() => toggleDraftSelection(item.id)}
-                          disabled={Boolean(item.product_id)}
-                          className="h-4 w-4 accent-[#059669] disabled:opacity-40"
-                          aria-label={`Select ${item.name}`}
-                        />
-                      </div>
-                      <div className="col-span-5 min-w-0 pr-3">
-                        <input
-                          value={item.name}
-                          onChange={event => updateDraftItem(item.id, { name: event.target.value })}
-                          disabled={Boolean(item.product_id)}
-                          className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-[13px] font-semibold text-gray-900 truncate focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
-                          title="Double-click or focus to edit product name"
-                        />
-                        <p className="text-[11px] text-gray-400 font-medium truncate">{item.raw_text || "No raw text"}</p>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-end gap-1">
-                        <input
-                          value={item.currency}
-                          onChange={event => updateDraftItem(item.id, { currency: event.target.value.toUpperCase().slice(0, 3) })}
-                          disabled={Boolean(item.product_id)}
-                          className="w-12 bg-transparent border border-transparent rounded-lg px-1 py-1 text-right text-[12px] font-bold font-mono text-gray-700 focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
-                          title="Double-click or focus to edit currency"
-                        />
-                        <input
-                          type="number"
-                          value={item.price ?? ""}
-                          onChange={event => updateDraftItem(item.id, { price: event.target.value === "" ? null : Number(event.target.value) })}
-                          disabled={Boolean(item.product_id)}
-                          className="w-24 bg-transparent border border-transparent rounded-lg px-1 py-1 text-right text-[12px] font-bold font-mono text-gray-900 focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
-                          placeholder="No price"
-                          title="Double-click or focus to edit price"
-                        />
-                      </div>
-                      <div className="col-span-2 text-center">
-                        <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${item.in_stock ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                          {item.product_id ? "IMPORTED" : item.status}
-                        </span>
-                      </div>
-                      <div className="col-span-2">
-                        <input
-                          value={item.description || ""}
-                          onChange={event => updateDraftItem(item.id, { description: event.target.value })}
-                          disabled={Boolean(item.product_id)}
-                          className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-[12px] font-medium text-gray-500 truncate focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
-                          placeholder="Description"
-                          title="Double-click or focus to edit description"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
 
         <div className="flex items-center gap-2 mb-6">
           <div className="relative">

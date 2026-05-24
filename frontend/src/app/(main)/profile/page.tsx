@@ -271,9 +271,15 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
               <input
                 type="email"
+                name="otc-new-email-target"
                 value={newEmail}
                 onChange={event => setNewEmail(event.target.value)}
                 placeholder="New email"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                data-1p-ignore="true"
+                data-lpignore="true"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
               />
               <ActionButton loading={saving === "email-request"} onClick={handleRequestEmailChange}>Request change</ActionButton>
