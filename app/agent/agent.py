@@ -1,4 +1,5 @@
 import operator
+import re
 from typing import Annotated, Sequence, TypedDict
 
 from langchain_openai import ChatOpenAI
@@ -216,9 +217,10 @@ async def run_customer_agent(
             "vendor_dict": vendor_dict,
             "vendor_settings": vendor_settings,
             "settings": settings,
-        }
+        },
+        "recursion_limit": 12,
     }
-    
+
     inputs = {
         "messages": [HumanMessage(content=incoming_message)],
         "vendor_id": vendor_id,
@@ -229,34 +231,22 @@ async def run_customer_agent(
 
     messages = final_state["messages"]
     ai_msg = next((m for m in reversed(messages) if m.type == "ai" and not m.tool_calls), None)
-    
-    customer_text = ai_msg.content if ai_msg else ""
+
+    customer_text = _strip_markdown(ai_msg.content if ai_msg else "")
+    if not customer_text.strip():
+        customer_text = "I'm here — could you tell me a bit more about what you're looking for?"
+
     customer_media = None
     new_order_status = final_state.get("order_status") or "INQUIRY"
-    
-    # 3. Check for signals in tool outputs with STRICT GUARDRAILS
-    # Following ANTIGRAVITY.md: Interface-driven and resilient logic.
-    payment_keywords = ["pay", "account", "bank", "transfer", "details", "send", "give", "how to", "transfer", "checkout"]
-    
+
     for m in reversed(final_state["messages"]):
         if m.type == "tool" and isinstance(m.content, str):
             if "CATALOGUE_MEDIA|" in m.content:
                 parts = m.content.split("|")
                 if len(parts) >= 3:
                     customer_media = {"kind": parts[1], "document_id": parts[2]}
-            
             if "SIGNAL:CHECKOUT_REQUESTED" in m.content:
-                # GUARDRAIL: Verify if the user actually asked for payment
-                last_customer_msg = next((msg.content.lower() for msg in reversed(final_state["messages"]) if msg.type == "human"), "")
-                has_intent = any(kw in last_customer_msg for kw in payment_keywords)
-                
-                if has_intent:
-                    new_order_status = "WAITING_VENDOR_CHECKOUT_APPROVAL"
-                else:
-                    # REJECT: Reset status and add a warning for the next turn
-                    # This ensures the UI doesn't show the checkout button
-                    new_order_status = "INQUIRY"
-                    print("Guardrail: Blocked premature checkout call.")
+                new_order_status = "WAITING_VENDOR_CHECKOUT_APPROVAL"
                 break
 
     return {
@@ -264,3 +254,26 @@ async def run_customer_agent(
         "customer_media": customer_media,
         "order_status": new_order_status
     }
+
+
+_MD_BOLD = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
+_MD_BOLD_UNDERSCORE = re.compile(r"__(.+?)__", re.DOTALL)
+_MD_ITALIC_STAR = re.compile(r"(?<![*\w])\*([^*\n]+?)\*(?!\w)")
+_MD_ITALIC_UNDERSCORE = re.compile(r"(?<![_\w])_([^_\n]+?)_(?!\w)")
+_MD_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+", re.MULTILINE)
+_MD_BLOCKQUOTE = re.compile(r"^\s{0,3}>\s+", re.MULTILINE)
+_MD_INLINE_CODE = re.compile(r"`([^`\n]+)`")
+
+
+def _strip_markdown(text: str) -> str:
+    """Best-effort removal of markdown so WhatsApp/Instagram don't render literal asterisks."""
+    if not text:
+        return text
+    text = _MD_BOLD.sub(r"\1", text)
+    text = _MD_BOLD_UNDERSCORE.sub(r"\1", text)
+    text = _MD_ITALIC_STAR.sub(r"\1", text)
+    text = _MD_ITALIC_UNDERSCORE.sub(r"\1", text)
+    text = _MD_INLINE_CODE.sub(r"\1", text)
+    text = _MD_HEADING.sub("", text)
+    text = _MD_BLOCKQUOTE.sub("", text)
+    return text

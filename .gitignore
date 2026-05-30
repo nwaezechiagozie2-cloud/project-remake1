@@ -60,3 +60,11 @@ Thumbs.db
 # Docker
 *.log
 docker-compose.override.yml
+
+# Scratch / experiments
+practice agent/
+
+# Claude-generated meta docs
+Creating Gitignore *.md
+HANDOFF*.md
+IMPLEMENTATION_HANDOFF*.md

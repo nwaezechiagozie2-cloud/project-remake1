@@ -37,12 +37,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center pt-[15vh] px-6 selection:bg-[#059669]/10 selection:text-[#059669]">
+    <div className="min-h-screen bg-white flex flex-col items-center pt-[15vh] px-6 selection:bg-[#3B5EE4]/10 selection:text-[#3B5EE4]">
       <div className="w-full max-w-[340px]">
         
         {/* Logo Mark */}
         <Link href="/" className="inline-flex items-center gap-2.5 mb-14 group">
-          <div className="w-8 h-8 bg-[#059669] rounded-xl flex items-center justify-center font-black text-white text-sm shadow-[0_4px_12px_rgba(9,9,11,0.3)] transition-transform group-hover:scale-105">
+          <div className="w-8 h-8 bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-[0_4px_12px_rgba(9,9,11,0.3)] transition-transform group-hover:scale-105">
             O
           </div>
           <span className="font-bold text-[17px] text-gray-900 tracking-tight">OmniClose</span>
@@ -51,7 +51,7 @@ export default function LoginPage() {
         {/* Header */}
         <div className="mb-10">
           <h1 className="text-[24px] font-bold tracking-[-0.03em] text-gray-900 leading-tight mb-1.5">Welcome back</h1>
-          <p className="text-[13px] text-gray-500 font-medium">Log in to your vendor dashboard</p>
+          <p className="text-[13px] text-gray-500 font-medium">Log in to your store dashboard</p>
         </div>
 
         {/* Form Body */}
@@ -74,7 +74,7 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="name@company.com"
-              className="w-full bg-gray-50/50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#059669]/30 focus:bg-white focus:border-[#059669]/40 transition-all placeholder:text-gray-300"
+              className="w-full bg-gray-50/50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30 focus:bg-white focus:border-[#3B5EE4]/40 transition-all placeholder:text-gray-300"
             />
           </div>
 
@@ -93,7 +93,7 @@ export default function LoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-gray-50/50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#059669]/30 focus:bg-white focus:border-[#059669]/40 transition-all placeholder:text-gray-300"
+              className="w-full bg-gray-50/50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30 focus:bg-white focus:border-[#3B5EE4]/40 transition-all placeholder:text-gray-300"
             />
           </div>
 
@@ -104,8 +104,8 @@ export default function LoginPage() {
           )}
 
           {status && (
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-               <p className="text-[12px] text-emerald-700 font-bold">{status}</p>
+            <div className="p-3 bg-[#EFF1FE] rounded-xl border border-[#E0E5FB]">
+               <p className="text-[12px] text-[#3B5EE4] font-bold">{status}</p>
             </div>
           )}
 
@@ -113,7 +113,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleLogin}
             disabled={loading}
-            className="w-full bg-[#059669] text-white font-bold text-[14px] py-3 rounded-xl transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#047857]"
+            className="w-full bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white font-bold text-[14px] py-3 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : "Sign in"}
             {!loading && <ArrowRight size={16} />}

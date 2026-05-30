@@ -184,7 +184,7 @@ export default function ProfilePage() {
           <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-gray-400 mb-1">Account</p>
           <h1 className="text-[24px] font-bold tracking-[-0.02em] text-gray-900">Profile</h1>
           {error && <p className="mt-3 text-[12px] font-bold text-red-600">{error}</p>}
-          {message && <p className="mt-3 text-[12px] font-bold text-emerald-700">{message}</p>}
+          {message && <p className="mt-3 text-[12px] font-bold text-[#3B5EE4]">{message}</p>}
         </div>
 
         <div className="space-y-10">
@@ -201,7 +201,7 @@ export default function ProfilePage() {
                 value={displayName}
                 onChange={event => setDisplayName(event.target.value)}
                 placeholder="Your name"
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20"
               />
               <ActionButton loading={saving === "profile"} onClick={handleUpdateProfile}>Save profile</ActionButton>
             </div>
@@ -213,7 +213,7 @@ export default function ProfilePage() {
                     <p className="text-[13px] font-bold text-gray-900 capitalize">{provider}</p>
                     <p className="text-[12px] text-gray-400 font-medium">Login provider</p>
                   </div>
-                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${profile?.providers?.[provider] ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${profile?.providers?.[provider] ? "bg-[#EFF1FE] text-[#3B5EE4]" : "bg-gray-100 text-gray-500"}`}>
                     {profile?.providers?.[provider] ? "Connected" : "Not linked"}
                   </span>
                 </div>
@@ -223,8 +223,8 @@ export default function ProfilePage() {
 
           <section className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                <Mail size={16} className="text-emerald-600" />
+              <div className="w-8 h-8 rounded-lg bg-[#EFF1FE] flex items-center justify-center">
+                <Mail size={16} className="text-[#3B5EE4]" />
               </div>
               <h2 className="text-[14px] font-bold text-gray-900">Email</h2>
             </div>
@@ -236,7 +236,7 @@ export default function ProfilePage() {
                   {profile?.email_verified ? "Verified email address" : "Email address is not verified"}
                 </p>
               </div>
-              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${profile?.email_verified ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${profile?.email_verified ? "bg-[#EFF1FE] text-[#3B5EE4]" : "bg-amber-50 text-amber-700"}`}>
                 <CheckCircle2 size={13} />
                 {profile?.email_verified ? "Verified" : "Unverified"}
               </span>
@@ -248,7 +248,7 @@ export default function ProfilePage() {
                   value={verifyToken}
                   onChange={event => setVerifyToken(event.target.value)}
                   placeholder="Verification token"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20"
                 />
                 <div className="flex gap-2">
                   <ActionButton loading={saving === "verify-request"} onClick={handleResendVerification}>Request token</ActionButton>
@@ -280,7 +280,7 @@ export default function ProfilePage() {
                 spellCheck={false}
                 data-1p-ignore="true"
                 data-lpignore="true"
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20"
               />
               <ActionButton loading={saving === "email-request"} onClick={handleRequestEmailChange}>Request change</ActionButton>
             </div>
@@ -289,7 +289,7 @@ export default function ProfilePage() {
                 value={emailChangeToken}
                 onChange={event => setEmailChangeToken(event.target.value)}
                 placeholder="Email-change token"
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20"
               />
               <ActionButton loading={saving === "email-confirm"} onClick={handleConfirmEmailChange}>Confirm change</ActionButton>
             </div>
@@ -308,14 +308,14 @@ export default function ProfilePage() {
                 value={passwords.current}
                 onChange={event => setPasswords({ ...passwords, current: event.target.value })}
                 placeholder="Current password"
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20"
               />
               <input
                 type="password"
                 value={passwords.next}
                 onChange={event => setPasswords({ ...passwords, next: event.target.value })}
                 placeholder="New password"
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20"
               />
             </div>
             <ActionButton loading={saving === "password"} onClick={handleChangePassword}>Update password</ActionButton>
@@ -332,7 +332,7 @@ function ActionButton({ children, loading, onClick }: { children: React.ReactNod
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="bg-[#059669] text-white px-4 py-2.5 rounded-xl text-[12px] font-bold hover:bg-[#047857] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+      className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white px-4 py-2.5 rounded-xl text-[12px] font-bold hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
     >
       {loading && <Loader2 size={14} className="animate-spin" />}
       {children}

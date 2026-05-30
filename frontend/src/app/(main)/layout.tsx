@@ -39,7 +39,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (!checkedAuth) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-gray-100 border-t-emerald-700 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-gray-100 border-t-[#3B5EE4] rounded-full animate-spin" />
       </div>
     );
   }
@@ -49,7 +49,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Sidebar — full height, clean border, no background box */}
       <aside className="w-[72px] border-r border-gray-100 flex flex-col items-center py-6 gap-3 shrink-0 sticky top-0 h-screen">
         {/* Logo mark */}
-        <Link href="/" className="w-9 h-9 mb-4 rounded-full bg-[#059669] flex items-center justify-center text-white font-black text-[15px] shrink-0 shadow-[0_4px_12px_rgba(15,23,42,0.35)]">
+        <Link href="/" className="w-9 h-9 mb-4 rounded-full bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 flex items-center justify-center text-white font-black text-[15px] shrink-0 shadow-[0_4px_12px_rgba(15,23,42,0.35)]">
           O
         </Link>
 
@@ -62,7 +62,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               title={label}
               className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
                 active
-                  ? "text-emerald-700"
+                  ? "text-[#3B5EE4]"
                   : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
               }`}
             >
@@ -77,7 +77,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             title="Settings"
             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
               path === "/settings" || path.startsWith("/settings/")
-                ? "text-emerald-700"
+                ? "text-[#3B5EE4]"
                 : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
             }`}
           >

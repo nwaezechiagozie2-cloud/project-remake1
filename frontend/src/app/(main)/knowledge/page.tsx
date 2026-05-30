@@ -182,7 +182,7 @@ export default function KnowledgePage() {
             </label>
             <button
               onClick={() => setShowAddModal(true)}
-              className="bg-[#059669] text-white text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#047857] transition-colors flex items-center gap-2"
+              className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 transition-colors flex items-center gap-2"
             >
               <Plus size={16} /> Add information
             </button>
@@ -197,7 +197,7 @@ export default function KnowledgePage() {
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Search info..."
-              className="bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-[13px] font-medium text-gray-700 w-56 focus:outline-none focus:ring-2 focus:ring-[#059669]/30 focus:border-[#059669]/40 placeholder:text-gray-400 transition-all"
+              className="bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-[13px] font-medium text-gray-700 w-56 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30 focus:border-[#3B5EE4]/40 placeholder:text-gray-400 transition-all"
             />
           </div>
         </div>
@@ -259,7 +259,7 @@ export default function KnowledgePage() {
                     value={newInfo.title}
                     onChange={event => setNewInfo({ ...newInfo, title: event.target.value })}
                     placeholder="e.g. Shipping & Returns Policy"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20"
                   />
                 </label>
                 <label className="space-y-1.5 block">
@@ -269,7 +269,7 @@ export default function KnowledgePage() {
                     onChange={event => setNewInfo({ ...newInfo, content: event.target.value })}
                     rows={6}
                     placeholder="Paste your business details here. The AI will read this to answer customer questions."
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20 resize-none"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20 resize-none"
                   />
                 </label>
               </div>
@@ -283,7 +283,7 @@ export default function KnowledgePage() {
                 <button
                   onClick={handleAdd}
                   disabled={saving}
-                  className="bg-[#059669] text-white px-6 py-2 rounded-xl text-[13px] font-bold shadow-sm hover:bg-[#047857] disabled:opacity-50 flex items-center gap-2"
+                  className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white px-6 py-2 rounded-xl text-[13px] font-bold shadow-sm hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   Save Information

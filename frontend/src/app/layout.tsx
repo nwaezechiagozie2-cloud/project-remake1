@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OmniClose",
-  description: "The WhatsApp sales assistant for modern vendors.",
+  description: "The WhatsApp & Instagram sales assistant for modern sellers.",
 };
 
 export default function RootLayout({

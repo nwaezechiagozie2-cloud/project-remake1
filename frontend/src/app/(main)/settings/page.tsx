@@ -140,7 +140,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white selection:bg-[#059669]/10 selection:text-[#059669]">
+    <div className="flex-1 overflow-y-auto bg-white selection:bg-[#3B5EE4]/10 selection:text-[#3B5EE4]">
       <div className="max-w-[780px] px-8 pt-10 pb-16 mx-auto">
         <div className="mb-12">
           <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-gray-400 mb-1">Configuration</p>
@@ -213,8 +213,8 @@ export default function SettingsPage() {
           <section className="space-y-6 pt-6 border-t border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  <Check size={16} className="text-emerald-600" />
+                <div className="w-8 h-8 rounded-lg bg-[#EFF1FE] flex items-center justify-center">
+                  <Check size={16} className="text-[#3B5EE4]" />
                 </div>
                 <h2 className="text-[14px] font-bold text-gray-900">Webhook</h2>
               </div>
@@ -253,7 +253,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {savingKey === item.key && <Loader2 size={13} className="animate-spin text-gray-400" />}
-                    <div className={`w-10 h-6 rounded-full transition-colors relative flex items-center px-1 ${settings[item.key] ? "bg-[#059669]" : "bg-gray-200"}`}>
+                    <div className={`w-10 h-6 rounded-full transition-colors relative flex items-center px-1 ${settings[item.key] ? "bg-[#3B5EE4]" : "bg-gray-200"}`}>
                       <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings[item.key] ? "translate-x-4" : "translate-x-0"}`} />
                     </div>
                   </div>

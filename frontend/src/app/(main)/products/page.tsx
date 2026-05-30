@@ -71,7 +71,7 @@ const emptyForm: ProductForm = {
 };
 
 const statusStyle: Record<string, string> = {
-  "In Stock": "text-emerald-500 bg-emerald-50",
+  "In Stock": "text-[#3B5EE4] bg-[#EFF1FE]",
   "Out of Stock": "text-red-700 bg-red-50",
 };
 
@@ -409,7 +409,7 @@ export default function ProductsPage() {
             </label>
             <button
               onClick={openCreate}
-              className="bg-[#059669] text-white text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#047857] transition-colors flex items-center gap-2"
+              className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 transition-colors flex items-center gap-2"
             >
               <Plus size={16} /> Add product
             </button>
@@ -434,7 +434,7 @@ export default function ProductsPage() {
                   key={upload.id}
                   onClick={() => selectUpload(upload.id)}
                   className={`w-full grid grid-cols-12 items-center px-3 py-3 rounded-xl text-left transition-colors border ${
-                    selectedUploadId === upload.id ? "border-emerald-700/30 bg-emerald-50/40" : "border-transparent hover:bg-gray-50"
+                    selectedUploadId === upload.id ? "border-[#3B5EE4]/30 bg-[#EFF1FE]/40" : "border-transparent hover:bg-gray-50"
                   }`}
                 >
                   <div className="col-span-7 flex items-center gap-3 min-w-0">
@@ -498,7 +498,7 @@ export default function ProductsPage() {
                           checked={selectedDraftIds.has(item.id)}
                           onChange={() => toggleDraftSelection(item.id)}
                           disabled={Boolean(item.product_id)}
-                          className="h-4 w-4 accent-[#059669] disabled:opacity-40"
+                          className="h-4 w-4 accent-[#3B5EE4] disabled:opacity-40"
                           aria-label={`Select ${item.name}`}
                         />
                       </div>
@@ -507,7 +507,7 @@ export default function ProductsPage() {
                           value={item.name}
                           onChange={event => updateDraftItem(item.id, { name: event.target.value })}
                           disabled={Boolean(item.product_id)}
-                          className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-[13px] font-semibold text-gray-900 truncate focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
+                          className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-[13px] font-semibold text-gray-900 truncate focus:bg-white focus:border-[#C5BFEC] focus:outline-none disabled:text-gray-400"
                         />
                         <p className="text-[11px] text-gray-400 font-medium truncate">{item.raw_text || "No raw text"}</p>
                       </div>
@@ -516,19 +516,19 @@ export default function ProductsPage() {
                           value={item.currency}
                           onChange={event => updateDraftItem(item.id, { currency: event.target.value.toUpperCase().slice(0, 3) })}
                           disabled={Boolean(item.product_id)}
-                          className="w-12 bg-transparent border border-transparent rounded-lg px-1 py-1 text-right text-[12px] font-bold font-mono text-gray-700 focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
+                          className="w-12 bg-transparent border border-transparent rounded-lg px-1 py-1 text-right text-[12px] font-bold font-mono text-gray-700 focus:bg-white focus:border-[#C5BFEC] focus:outline-none disabled:text-gray-400"
                         />
                         <input
                           type="number"
                           value={item.price ?? ""}
                           onChange={event => updateDraftItem(item.id, { price: event.target.value === "" ? null : Number(event.target.value) })}
                           disabled={Boolean(item.product_id)}
-                          className="w-24 bg-transparent border border-transparent rounded-lg px-1 py-1 text-right text-[12px] font-bold font-mono text-gray-900 focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
+                          className="w-24 bg-transparent border border-transparent rounded-lg px-1 py-1 text-right text-[12px] font-bold font-mono text-gray-900 focus:bg-white focus:border-[#C5BFEC] focus:outline-none disabled:text-gray-400"
                           placeholder="No price"
                         />
                       </div>
                       <div className="col-span-2 text-center">
-                        <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${item.in_stock ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                        <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${item.in_stock ? "bg-[#EFF1FE] text-[#3B5EE4]" : "bg-red-50 text-red-700"}`}>
                           {item.product_id ? "IMPORTED" : item.status}
                         </span>
                       </div>
@@ -537,7 +537,7 @@ export default function ProductsPage() {
                           value={item.description || ""}
                           onChange={event => updateDraftItem(item.id, { description: event.target.value })}
                           disabled={Boolean(item.product_id)}
-                          className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-[12px] font-medium text-gray-500 truncate focus:bg-white focus:border-emerald-200 focus:outline-none disabled:text-gray-400"
+                          className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-[12px] font-medium text-gray-500 truncate focus:bg-white focus:border-[#C5BFEC] focus:outline-none disabled:text-gray-400"
                           placeholder="Description"
                         />
                       </div>
@@ -557,7 +557,7 @@ export default function ProductsPage() {
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Search products..."
-              className="bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-[13px] font-medium text-gray-700 w-56 focus:outline-none focus:ring-2 focus:ring-[#059669]/30 focus:border-[#059669]/40 placeholder:text-gray-400 transition-all"
+              className="bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-[13px] font-medium text-gray-700 w-56 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30 focus:border-[#3B5EE4]/40 placeholder:text-gray-400 transition-all"
             />
           </div>
           {(["all", "in", "out"] as const).map(value => (
@@ -566,7 +566,7 @@ export default function ProductsPage() {
               type="button"
               onClick={() => setStockFilter(value)}
               className={`px-3 py-2 rounded-xl text-[12px] font-bold border transition-colors ${
-                stockFilter === value ? "border-emerald-700/30 bg-emerald-50 text-emerald-700" : "border-gray-100 text-gray-500 hover:bg-gray-50"
+                stockFilter === value ? "border-[#3B5EE4]/30 bg-[#EFF1FE] text-[#3B5EE4]" : "border-gray-100 text-gray-500 hover:bg-gray-50"
               }`}
             >
               {value === "all" ? "All" : value === "in" ? "In stock" : "Out"}
@@ -662,7 +662,7 @@ export default function ProductsPage() {
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, in_stock: !form.in_stock })}
-                      className={`w-full px-4 py-2.5 rounded-xl text-[13px] font-bold text-left ${form.in_stock ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                      className={`w-full px-4 py-2.5 rounded-xl text-[13px] font-bold text-left ${form.in_stock ? "bg-[#EFF1FE] text-[#3B5EE4]" : "bg-red-50 text-red-700"}`}
                     >
                       {form.in_stock ? "In Stock" : "Out of Stock"}
                     </button>
@@ -676,7 +676,7 @@ export default function ProductsPage() {
                     onChange={event => setForm({ ...form, extra_details: event.target.value })}
                     rows={3}
                     placeholder="Materials, sizes, or anything the AI should know."
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20 resize-none"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20 resize-none"
                   />
                 </label>
                 <Field label="Image URL" value={form.image_url} onChange={value => setForm({ ...form, image_url: value })} placeholder="https://..." />
@@ -687,7 +687,7 @@ export default function ProductsPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-[#059669] text-white px-6 py-2 rounded-xl text-[13px] font-bold shadow-sm hover:bg-[#047857] disabled:opacity-50 flex items-center gap-2"
+                  className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white px-6 py-2 rounded-xl text-[13px] font-bold shadow-sm hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   {editingProduct ? "Save Changes" : "Add to Catalog"}
@@ -720,7 +720,7 @@ export default function ProductsPage() {
                     onChange={event => setPasteText(event.target.value)}
                     rows={10}
                     placeholder={"Paste your product list here. One product per line works best, e.g.\nLeather bag - 15000\nWooden lamp - 25000"}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#059669]/20 resize-none"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20 resize-none"
                   />
                 </label>
               </div>
@@ -729,7 +729,7 @@ export default function ProductsPage() {
                 <button
                   onClick={handlePasteSubmit}
                   disabled={uploading || !pasteText.trim()}
-                  className="bg-[#059669] text-white px-6 py-2 rounded-xl text-[13px] font-bold shadow-sm hover:bg-[#047857] disabled:opacity-50 flex items-center gap-2"
+                  className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white px-6 py-2 rounded-xl text-[13px] font-bold shadow-sm hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 disabled:opacity-50 flex items-center gap-2"
                 >
                   {uploading && <Loader2 size={14} className="animate-spin" />}
                   Submit
@@ -764,7 +764,7 @@ function Field({
         value={value}
         onChange={event => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#059669]/20"
+        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/20"
       />
     </label>
   );
