@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,6 +40,18 @@ def ensure_required_env_vars(settings) -> None:
             raise RuntimeError(f"Missing required environment variables for {settings.app_env} mode: {', '.join(missing)}")
 
 
+def _allowed_cors_origins(settings) -> list[str]:
+    origins = []
+    frontend_url = (settings.frontend_base_url or "").rstrip("/")
+    if frontend_url:
+        origins.append(frontend_url)
+
+    if settings.app_env in ("development", "dev", "local", "test", "testing"):
+        origins.extend(["http://localhost:3000", "http://127.0.0.1:3000"])
+
+    return list(dict.fromkeys(origin for origin in origins if urlparse(origin).scheme and urlparse(origin).netloc))
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     ensure_required_env_vars(settings)
@@ -49,7 +62,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=_allowed_cors_origins(settings),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

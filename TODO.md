@@ -84,10 +84,35 @@ The Explore agent's summary parroted these and I shipped wrong claims as a resul
 
 ---
 
+## Scan findings — 2026-06-01
+
+### 17. README test instructions are intentionally out of date
+`README.md` references `pytest -q tests`, but the `tests/` directory has been removed intentionally. Either remove that command from the README, replace it with the current script-based checks, or add a short note that automated tests are temporarily absent.
+
+Current available validation scripts:
+- `scripts/smoke_test.py`
+- `scripts/post_deploy_smoke.py`
+- `scripts/test_agent.py`
+- `scripts/test_fallback.py`
+- `scripts/simulate_chat.py`
+
+### 18. Heroku deployment needs `$PORT` support
+`Dockerfile` currently runs `uvicorn ... --port 8001`. Heroku web dynos must bind to the runtime-assigned `$PORT`, so either use a `Procfile`/buildpack deployment with `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, or update the container command / `heroku.yml` to use `$PORT`.
+
+### 19. Frontend and backend need separate deployment decisions
+The repo contains both a FastAPI backend at the root and a Next app under `frontend/`. Heroku can deploy them as separate apps, but the frontend must have `NEXT_PUBLIC_API_URL` set to the deployed backend URL. Alternatively, deploy only the backend to Heroku and put the frontend on Vercel/Netlify.
+
+### 20. Production CORS should be pinned before deploy
+`app/main.py` currently allows all origins while also allowing credentials. For production, use `settings.frontend_base_url` or an explicit allowed-origin list so browser auth requests from the deployed frontend behave predictably.
+
+### 21. Database choice must be settled for Heroku
+`app/config.py` defaults to MySQL-style settings and `docker-compose.yml` uses MySQL locally. Heroku's first-party managed SQL add-on is typically Postgres, but this code does not include `asyncpg` or a Postgres URL path. For the lowest-change Heroku deploy, use a managed MySQL provider and set `DATABASE_URL=mysql+aiomysql://...`.
+
+### 22. Runtime SQLite checkpoint file is not durable on Heroku
+`app/services/agent_service.py` and `app/agent/agent.py` use `checkpoints.db` for LangGraph memory. Heroku dyno filesystems are ephemeral, so agent checkpoint memory can disappear on restart/redeploy. Move this to a durable store before depending on conversation memory in production.
+
+---
+
 ## Not yet reviewed (next pass)
-- `app/api/routes/*` — webhook, instagram_webhook, vendor_admin, auth, profile, health
-- `app/repositories/*` — sql.py, models.py, base.py
-- `app/services/*` — webhook_service, whatsapp_service, instagram_service, google_*, catalogue_ingestion_service, oauth_login_service, auth_service
-- `app/schemas/api.py`, `app/domain/*`, `app/security.py`, `app/observability.py`, `app/exception_handler.py`
-- `frontend/src/**`
 - Alembic migrations vs current `app/repositories/models.py`
+- Full production deploy rehearsal on Heroku
