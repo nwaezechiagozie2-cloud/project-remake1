@@ -27,7 +27,6 @@ def ensure_required_env_vars(settings) -> None:
     if settings.app_env in ("production", "staging"):
         missing = []
         if not settings.whatsapp_verify_token: missing.append("WHATSAPP_VERIFY_TOKEN")
-        if not settings.whatsapp_app_secret: missing.append("WHATSAPP_APP_SECRET")
         if not settings.google_client_id: missing.append("GOOGLE_CLIENT_ID")
         if not settings.google_client_secret: missing.append("GOOGLE_CLIENT_SECRET")
         
