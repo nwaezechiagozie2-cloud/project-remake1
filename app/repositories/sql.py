@@ -36,6 +36,8 @@ def _vendor_dict(vendor: Vendor | None) -> dict | None:
         "whatsapp_phone_number_id": vendor.whatsapp_phone_number_id,
         "instagram_page_id": vendor.instagram_page_id,
         "instagram_page_token": vendor.instagram_page_token,
+        "telegram_bot_token": vendor.telegram_bot_token,
+        "telegram_vendor_chat_id": vendor.telegram_vendor_chat_id,
         "account_number": vendor.account_number,
         "bank_name": vendor.bank_name,
         "account_name": vendor.account_name,
@@ -233,6 +235,25 @@ class SQLVendorRepository:
             )).scalar_one_or_none()
             return _vendor_dict(vendor)
 
+    async def get_by_telegram_vendor_chat_id(self, chat_id: str) -> dict | None:
+        async with get_session() as session:
+            vendor = (await session.execute(
+                select(Vendor).where(Vendor.telegram_vendor_chat_id == chat_id)
+            )).scalar_one_or_none()
+            return _vendor_dict(vendor)
+
+    async def get_by_telegram_customer_chat_id(self, chat_id: str) -> dict | None:
+        async with get_session() as session:
+            vendor = (await session.execute(
+                select(Vendor)
+                .join(VendorCustomer, VendorCustomer.vendor_id == Vendor.id)
+                .join(Customer, Customer.id == VendorCustomer.customer_id)
+                .where(Customer.telegram_chat_id == chat_id)
+                .order_by(VendorCustomer.last_seen_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+            return _vendor_dict(vendor)
+
     async def update_instagram_credentials(self, vendor_id: int, page_id: str, page_token: str) -> dict | None:
         async with get_session() as session:
             vendor = await session.get(Vendor, vendor_id)
@@ -240,6 +261,38 @@ class SQLVendorRepository:
                 return None
             vendor.instagram_page_id = page_id
             vendor.instagram_page_token = page_token
+            await session.flush()
+            return _vendor_dict(vendor)
+
+    async def update_whatsapp_credentials(
+        self,
+        vendor_id: int,
+        whatsapp_number: str | None = None,
+        whatsapp_token: str | None = None,
+        whatsapp_phone_number_id: str | None = None,
+    ) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return None
+            if whatsapp_number is not None:
+                vendor.whatsapp_number = whatsapp_number
+            if whatsapp_token is not None:
+                vendor.whatsapp_token = whatsapp_token
+            if whatsapp_phone_number_id is not None:
+                vendor.whatsapp_phone_number_id = whatsapp_phone_number_id
+            await session.flush()
+            return _vendor_dict(vendor)
+
+    async def update_telegram_credentials(self, vendor_id: int, bot_token: str | None = None, vendor_chat_id: str | None = None) -> dict | None:
+        async with get_session() as session:
+            vendor = await session.get(Vendor, vendor_id)
+            if not vendor:
+                return None
+            if bot_token is not None:
+                vendor.telegram_bot_token = bot_token
+            if vendor_chat_id is not None:
+                vendor.telegram_vendor_chat_id = vendor_chat_id
             await session.flush()
             return _vendor_dict(vendor)
 
@@ -579,6 +632,40 @@ class SQLCustomerRepository:
                 "id": customer.id,
                 "name": customer.name,
                 "instagram_id": customer.instagram_id,
+            }
+
+    async def get_or_create_by_telegram(self, telegram_id: str, chat_id: str, display_name: str | None = None) -> dict:
+        async with get_session() as session:
+            customer = (await session.execute(
+                select(Customer).where(
+                    or_(
+                        Customer.telegram_id == telegram_id,
+                        Customer.telegram_chat_id == chat_id,
+                    )
+                )
+            )).scalar_one_or_none()
+            if customer:
+                if display_name and not customer.name:
+                    customer.name = display_name
+                if not customer.telegram_id:
+                    customer.telegram_id = telegram_id
+                if not customer.telegram_chat_id:
+                    customer.telegram_chat_id = chat_id
+                await session.flush()
+                return {
+                    "id": customer.id,
+                    "name": customer.name,
+                    "telegram_id": customer.telegram_id,
+                    "telegram_chat_id": customer.telegram_chat_id,
+                }
+            customer = Customer(telegram_id=telegram_id, telegram_chat_id=chat_id, name=display_name)
+            session.add(customer)
+            await session.flush()
+            return {
+                "id": customer.id,
+                "name": customer.name,
+                "telegram_id": customer.telegram_id,
+                "telegram_chat_id": customer.telegram_chat_id,
             }
 
     async def upsert_vendor_customer(self, vendor_id: int, customer_id: int) -> None:

@@ -54,6 +54,23 @@ export type VendorProfile = {
   providers: Record<string, boolean>;
 };
 
+export type TelegramCredentials = {
+  telegram_vendor_chat_id: string | null;
+  has_bot_token: boolean;
+  connected: boolean;
+  webhook_url: string;
+  message: string;
+};
+
+export type WhatsAppCredentials = {
+  whatsapp_number: string | null;
+  whatsapp_phone_number_id: string | null;
+  has_access_token: boolean;
+  connected: boolean;
+  webhook_url: string;
+  message: string;
+};
+
 export function getApiErrorMessage(error: unknown, fallback = "Request failed") {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as ApiErrorPayload | undefined;
@@ -203,6 +220,44 @@ export const fetchInstagramCredentials = async (vendorId: string | number, token
   const client = getAuthClient(vendorId, token);
   const { data } = await client.get("/instagram-credentials");
   return data;
+};
+
+export const fetchWhatsAppCredentials = async (vendorId: string | number, token: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.get("/whatsapp-credentials");
+  return data as WhatsAppCredentials;
+};
+
+export const updateWhatsAppCredentials = async (
+  vendorId: string | number,
+  token: string,
+  payload: { whatsapp_number?: string; whatsapp_token?: string; whatsapp_phone_number_id?: string },
+) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.put("/whatsapp-credentials", payload);
+  return data as WhatsAppCredentials;
+};
+
+export const fetchTelegramCredentials = async (vendorId: string | number, token: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.get("/telegram-credentials");
+  return data as TelegramCredentials;
+};
+
+export const updateTelegramCredentials = async (
+  vendorId: string | number,
+  token: string,
+  payload: { telegram_bot_token?: string; telegram_vendor_chat_id?: string },
+) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.put("/telegram-credentials", payload);
+  return data as TelegramCredentials;
+};
+
+export const configureTelegramWebhook = async (vendorId: string | number, token: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.post("/telegram-webhook");
+  return data as { status: string; webhook_url: string };
 };
 
 export const fetchCatalogueUploads = async (vendorId: string | number, token: string) => {

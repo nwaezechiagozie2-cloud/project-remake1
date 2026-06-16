@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from app.domain.models import ParsedInboundMessage
-from app.domain.interfaces import AgentOrchestrator, ContactsAdapter, CustomerRepository, VendorRepository, WhatsAppAdapter, InstagramAdapter
+from app.domain.interfaces import AgentOrchestrator, ContactsAdapter, CustomerRepository, VendorRepository, WhatsAppAdapter, InstagramAdapter, TelegramAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ class WebhookService:
         agent: AgentOrchestrator,
         whatsapp: WhatsAppAdapter,
         instagram: InstagramAdapter | None = None,
+        telegram: TelegramAdapter | None = None,
     ) -> None:
         self.vendors = vendors
         self.customers = customers
@@ -26,6 +27,7 @@ class WebhookService:
         self.agent = agent
         self.whatsapp = whatsapp
         self.instagram = instagram
+        self.telegram = telegram
 
     async def handle_payload(self, payload: dict) -> dict:
         obj_type = payload.get("object", "")
@@ -33,6 +35,8 @@ class WebhookService:
             inbound_messages = self._extract_inbound_messages(payload)
         elif obj_type == "instagram":
             inbound_messages = self._extract_instagram_messages(payload)
+        elif obj_type == "telegram":
+            inbound_messages = self._extract_telegram_messages(payload.get("update") or payload)
         else:
             inbound_messages = []
 
@@ -47,6 +51,8 @@ class WebhookService:
         # --- Resolve vendor based on platform ---
         if message.platform == "instagram":
             vendor = await self.vendors.get_by_instagram_page_id(message.phone_number_id)
+        elif message.platform == "telegram":
+            vendor = await self._resolve_telegram_vendor(message)
         else:
             vendor = await self.vendors.get_by_phone_number_id(message.phone_number_id)
 
@@ -57,6 +63,12 @@ class WebhookService:
         # --- Resolve customer based on platform ---
         if message.platform == "instagram":
             customer = await self.customers.get_or_create_by_instagram(message.from_number, display_name=message.profile_name)
+        elif message.platform == "telegram":
+            customer = await self.customers.get_or_create_by_telegram(
+                telegram_id=message.from_number,
+                chat_id=str((message.raw.get("chat") or {}).get("id") or message.from_number),
+                display_name=message.profile_name,
+            )
         else:
             customer = await self.customers.get_or_create_by_whatsapp(message.from_number, display_name=message.profile_name)
         await self.customers.upsert_vendor_customer(vendor_id=vendor["id"], customer_id=customer["id"])
@@ -73,7 +85,7 @@ class WebhookService:
             body_text=message.text,
             whatsapp_message_id=message.message_id,
             sender_number=message.from_number,
-            recipient_number=vendor.get("whatsapp_number"),
+            recipient_number=self._vendor_recipient_id(vendor, message.platform),
         )
 
         if message.profile_name:
@@ -83,10 +95,10 @@ class WebhookService:
                 if saved_now:
                     await self.customers.set_google_contact_saved(vendor_id=vendor["id"], customer_id=customer["id"], saved=True)
 
-        is_vendor_sender = bool(vendor.get("whatsapp_number") and message.from_number == vendor["whatsapp_number"])
+        is_vendor_sender = self._is_vendor_sender(vendor, message)
 
         # Determine which messaging adapter to use for this conversation
-        _messenger = self.instagram if message.platform == "instagram" and self.instagram else self.whatsapp
+        _messenger = self._messenger_for_platform(message.platform)
 
         if await self._check_and_handle_timeout(vendor=vendor, customer=customer, message=message, is_vendor_sender=is_vendor_sender, messenger=_messenger):
             return
@@ -102,7 +114,7 @@ class WebhookService:
             )
 
         if decision.customer_text:
-            customer_target = decision.customer_target_number or message.from_number
+            customer_target = decision.customer_target_number or self._customer_reply_target(message)
             await _messenger.send_text(vendor=vendor, to=customer_target, body=decision.customer_text)
             await self.customers.record_message(
                 vendor_id=vendor["id"],
@@ -110,12 +122,14 @@ class WebhookService:
                 direction="OUTBOUND",
                 message_type="text",
                 body_text=decision.customer_text,
-                sender_number=vendor.get("whatsapp_number"),
+                sender_number=self._vendor_recipient_id(vendor, message.platform),
                 recipient_number=customer_target,
             )
 
         if decision.vendor_buttons:
-            vendor_target = vendor.get("whatsapp_number") or message.from_number
+            vendor_target = self._vendor_recipient_id(vendor, message.platform)
+            if not vendor_target and message.platform != "telegram":
+                vendor_target = message.from_number
             if message.platform == "instagram" and self.instagram:
                 # Instagram uses quick replies instead of interactive buttons
                 replies = [{"title": b["title"], "payload": b["id"]} for b in decision.vendor_buttons]
@@ -125,6 +139,17 @@ class WebhookService:
                     body=decision.vendor_text or "Please confirm action",
                     replies=replies,
                 )
+            elif message.platform == "telegram":
+                if vendor_target:
+                    # Telegram MVP sends approval prompts as plain text; button callbacks can be added later.
+                    button_text = "\n".join(f"{button['title']}: {button['id']}" for button in decision.vendor_buttons)
+                    await _messenger.send_text(
+                        vendor=vendor,
+                        to=vendor_target,
+                        body=f"{decision.vendor_text or 'Please confirm action'}\n\n{button_text}",
+                    )
+                else:
+                    logger.warning("Skipped Telegram vendor buttons because vendor chat is not configured | vendor_id=%s", vendor["id"])
             else:
                 await self.whatsapp.send_buttons(
                     vendor=vendor,
@@ -138,21 +163,64 @@ class WebhookService:
                 direction="OUTBOUND",
                 message_type="interactive",
                 body_text=decision.vendor_text or "Please confirm action",
-                sender_number=vendor.get("whatsapp_number"),
+                sender_number=self._vendor_recipient_id(vendor, message.platform),
                 recipient_number=vendor_target,
             )
         elif decision.vendor_text:
-            vendor_target = vendor.get("whatsapp_number") or message.from_number
-            await _messenger.send_text(vendor=vendor, to=vendor_target, body=decision.vendor_text)
-            await self.customers.record_message(
-                vendor_id=vendor["id"],
-                customer_id=customer["id"],
-                direction="OUTBOUND",
-                message_type="text",
-                body_text=decision.vendor_text,
-                sender_number=vendor.get("whatsapp_number"),
-                recipient_number=vendor_target,
-            )
+            vendor_target = self._vendor_recipient_id(vendor, message.platform)
+            if not vendor_target and message.platform != "telegram":
+                vendor_target = message.from_number
+            if vendor_target:
+                await _messenger.send_text(vendor=vendor, to=vendor_target, body=decision.vendor_text)
+                await self.customers.record_message(
+                    vendor_id=vendor["id"],
+                    customer_id=customer["id"],
+                    direction="OUTBOUND",
+                    message_type="text",
+                    body_text=decision.vendor_text,
+                    sender_number=self._vendor_recipient_id(vendor, message.platform),
+                    recipient_number=vendor_target,
+                )
+            elif message.platform == "telegram":
+                logger.warning("Skipped Telegram vendor text because vendor chat is not configured | vendor_id=%s", vendor["id"])
+
+    async def _resolve_telegram_vendor(self, message: ParsedInboundMessage) -> dict | None:
+        chat = message.raw.get("chat") or {}
+        chat_id = str(chat.get("id") or "")
+        if chat_id:
+            vendor = await self.vendors.get_by_telegram_vendor_chat_id(chat_id)
+            if vendor:
+                return vendor
+
+        if message.text.startswith("/start"):
+            parts = message.text.split(maxsplit=1)
+            if len(parts) == 2 and parts[1].strip().isdigit():
+                return await self.vendors.get_by_id(int(parts[1].strip()))
+        if chat_id:
+            return await self.vendors.get_by_telegram_customer_chat_id(chat_id)
+        return None
+
+    def _messenger_for_platform(self, platform: str):
+        if platform == "instagram" and self.instagram:
+            return self.instagram
+        if platform == "telegram" and self.telegram:
+            return self.telegram
+        return self.whatsapp
+
+    @staticmethod
+    def _vendor_recipient_id(vendor: dict, platform: str) -> str | None:
+        if platform == "instagram":
+            return vendor.get("instagram_page_id")
+        if platform == "telegram":
+            return vendor.get("telegram_vendor_chat_id")
+        return vendor.get("whatsapp_number")
+
+    @staticmethod
+    def _is_vendor_sender(vendor: dict, message: ParsedInboundMessage) -> bool:
+        if message.platform == "telegram":
+            chat_id = str((message.raw.get("chat") or {}).get("id") or "")
+            return bool(vendor.get("telegram_vendor_chat_id") and chat_id == vendor["telegram_vendor_chat_id"])
+        return bool(vendor.get("whatsapp_number") and message.from_number == vendor["whatsapp_number"])
 
     async def _check_and_handle_timeout(
         self,
@@ -186,7 +254,8 @@ class WebhookService:
             await self._send_and_record_timeout_messages(
                 vendor=vendor,
                 customer=customer,
-                customer_target=message.from_number,
+                customer_target=self._customer_reply_target(message),
+                platform=message.platform,
                 customer_text=customer_text,
                 vendor_text=vendor_text,
                 messenger=messenger,
@@ -205,7 +274,8 @@ class WebhookService:
             await self._send_and_record_timeout_messages(
                 vendor=vendor,
                 customer=customer,
-                customer_target=message.from_number,
+                customer_target=self._customer_reply_target(message),
+                platform=message.platform,
                 customer_text=customer_text,
                 vendor_text=vendor_text,
                 messenger=messenger,
@@ -226,11 +296,12 @@ class WebhookService:
         vendor: dict,
         customer: dict,
         customer_target: str,
+        platform: str,
         customer_text: str,
         vendor_text: str,
         messenger=None,
     ) -> None:
-        vendor_target = vendor.get("whatsapp_number") or customer_target
+        vendor_target = self._vendor_recipient_id(vendor, platform) or customer_target
         _messenger = messenger or self.whatsapp
 
         await _messenger.send_text(vendor=vendor, to=customer_target, body=customer_text)
@@ -240,7 +311,7 @@ class WebhookService:
             direction="OUTBOUND",
             message_type="text",
             body_text=customer_text,
-            sender_number=vendor.get("whatsapp_number"),
+            sender_number=self._vendor_recipient_id(vendor, platform),
             recipient_number=customer_target,
         )
 
@@ -251,9 +322,15 @@ class WebhookService:
             direction="OUTBOUND",
             message_type="text",
             body_text=vendor_text,
-            sender_number=vendor.get("whatsapp_number"),
+            sender_number=self._vendor_recipient_id(vendor, platform),
             recipient_number=vendor_target,
         )
+
+    @staticmethod
+    def _customer_reply_target(message: ParsedInboundMessage) -> str:
+        if message.platform == "telegram":
+            return str((message.raw.get("chat") or {}).get("id") or message.from_number)
+        return message.from_number
 
     def _extract_inbound_messages(self, payload: dict) -> list[ParsedInboundMessage]:
         if payload.get("object") != "whatsapp_business_account":
@@ -344,3 +421,62 @@ class WebhookService:
         if quick_reply:
             return (quick_reply.get("payload") or message.get("text") or "").strip()
         return (message.get("text") or "").strip()
+
+    # ---- Telegram webhook parsing ----
+
+    def _extract_telegram_messages(self, update: dict) -> list[ParsedInboundMessage]:
+        message = update.get("message") or update.get("edited_message")
+        if not message:
+            callback_query = update.get("callback_query") or {}
+            message = callback_query.get("message")
+            if not message:
+                return []
+            callback_data = callback_query.get("data") or ""
+            sender = callback_query.get("from") or {}
+            chat = message.get("chat") or {}
+            return [
+                ParsedInboundMessage(
+                    from_number=str(sender.get("id") or ""),
+                    phone_number_id=str(chat.get("id") or ""),
+                    message_id=str(callback_query.get("id") or message.get("message_id") or ""),
+                    text=callback_data.strip(),
+                    message_type="callback_query",
+                    platform="telegram",
+                    profile_name=self._telegram_display_name(sender),
+                    raw={**message, "callback_query": callback_query},
+                )
+            ]
+
+        sender = message.get("from") or {}
+        chat = message.get("chat") or {}
+        text = self._telegram_message_text(message)
+        if not text:
+            return []
+        return [
+            ParsedInboundMessage(
+                from_number=str(sender.get("id") or chat.get("id") or ""),
+                phone_number_id=str(chat.get("id") or ""),
+                message_id=str(message.get("message_id") or ""),
+                text=text,
+                message_type="text",
+                platform="telegram",
+                profile_name=self._telegram_display_name(sender),
+                raw=message,
+            )
+        ]
+
+    @staticmethod
+    def _telegram_message_text(message: dict) -> str:
+        return (
+            message.get("text")
+            or message.get("caption")
+            or ""
+        ).strip()
+
+    @staticmethod
+    def _telegram_display_name(sender: dict) -> str | None:
+        first_name = sender.get("first_name") or ""
+        last_name = sender.get("last_name") or ""
+        username = sender.get("username")
+        full_name = " ".join(part for part in [first_name, last_name] if part).strip()
+        return full_name or username

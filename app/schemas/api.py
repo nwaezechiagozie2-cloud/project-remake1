@@ -354,3 +354,31 @@ class InstagramCredentialsResponse(BaseModel):
     instagram_page_id: str | None = None
     connected: bool = False
     message: str = ""
+
+
+class WhatsAppCredentialsRequest(BaseModel):
+    whatsapp_number: str | None = Field(default=None, min_length=1, max_length=50)
+    whatsapp_token: str | None = Field(default=None, min_length=1)
+    whatsapp_phone_number_id: str | None = Field(default=None, min_length=1, max_length=100)
+
+
+class WhatsAppCredentialsResponse(BaseModel):
+    whatsapp_number: str | None = None
+    whatsapp_phone_number_id: str | None = None
+    has_access_token: bool = False
+    connected: bool = False
+    webhook_url: str
+    message: str = ""
+
+
+class TelegramCredentialsRequest(BaseModel):
+    telegram_bot_token: str | None = Field(default=None, min_length=1)
+    telegram_vendor_chat_id: str | None = Field(default=None, min_length=1, max_length=100)
+
+
+class TelegramCredentialsResponse(BaseModel):
+    telegram_vendor_chat_id: str | None = None
+    has_bot_token: bool = False
+    connected: bool = False
+    webhook_url: str
+    message: str = ""

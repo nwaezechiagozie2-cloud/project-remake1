@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     instagram_redirect_uri: str = Field(default="http://localhost:8001/auth/instagram/callback", alias="INSTAGRAM_REDIRECT_URI")
     instagram_login_redirect_uri: str = Field(default="http://localhost:8001/auth/login/instagram/callback", alias="INSTAGRAM_LOGIN_REDIRECT_URI")
 
+    telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
+    telegram_webhook_secret: str = Field(default="", alias="TELEGRAM_WEBHOOK_SECRET")
+
     jwt_secret: str = Field(default="change_me", alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_ttl_hours: int = Field(default=168, alias="JWT_TTL_HOURS")
@@ -74,6 +77,7 @@ class Settings(BaseSettings):
     google_login_redirect_uri: str = Field(default="http://localhost:8001/auth/login/google/callback", alias="GOOGLE_LOGIN_REDIRECT_URI")
     google_customer_group_resource: str = Field(default="", alias="GOOGLE_CUSTOMER_GROUP_RESOURCE")
     frontend_base_url: str = Field(default="http://localhost:3000", alias="FRONTEND_BASE_URL")
+    public_api_base_url: str = Field(default="http://localhost:8001", alias="PUBLIC_API_BASE_URL")
 
 
 @lru_cache(maxsize=1)

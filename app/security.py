@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -10,14 +11,26 @@ from fastapi import Request
 from app.config import Settings, get_settings
 from app.exceptions import AuthorizationError, TooManyRequestsError, ValidationError
 
+logger = logging.getLogger(__name__)
+
 _redis_client: redis.Redis | None = None
+_redis_unavailable_logged = False
+
+
+def _allows_in_memory_rate_limit_fallback(settings: Settings) -> bool:
+    return (settings.app_env or "development").strip().lower() in {"development", "dev", "local", "test", "testing"}
 
 def get_redis_client() -> redis.Redis | None:
     global _redis_client
     if _redis_client is None:
         settings = get_settings()
-        if settings.redis_url:
-            _redis_client = redis.from_url(settings.redis_url, decode_responses=True)
+        if settings.redis_url and not _allows_in_memory_rate_limit_fallback(settings):
+            _redis_client = redis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=1,
+                socket_timeout=1,
+            )
     return _redis_client
 
 
@@ -91,6 +104,8 @@ class InMemoryRateLimiter:
 rate_limiter = InMemoryRateLimiter()
 
 async def check_rate_limit_redis(key: str, max_requests: int, window_seconds: int) -> bool:
+    global _redis_unavailable_logged
+
     client = get_redis_client()
     if not client:
         return rate_limiter.allow(key, max_requests=max_requests, window_seconds=window_seconds)
@@ -101,7 +116,22 @@ async def check_rate_limit_redis(key: str, max_requests: int, window_seconds: in
     pipeline.zadd(key, {str(now + float(time.monotonic() % 1)): now})
     pipeline.zcard(key)
     pipeline.expire(key, window_seconds)
-    results = await pipeline.execute()
+    try:
+        results = await pipeline.execute()
+    except redis.RedisError as exc:
+        settings = get_settings()
+        if not _allows_in_memory_rate_limit_fallback(settings):
+            raise
+
+        if not _redis_unavailable_logged:
+            logger.warning(
+                "redis_rate_limiter_unavailable | fallback=in_memory | redis_url=%s | reason=%s",
+                settings.redis_url,
+                exc,
+            )
+            _redis_unavailable_logged = True
+        return rate_limiter.allow(key, max_requests=max_requests, window_seconds=window_seconds)
+
     count = results[2]
     return count <= max_requests
 

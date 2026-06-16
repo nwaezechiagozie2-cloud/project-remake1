@@ -20,6 +20,7 @@ from app.services.webhook_service import WebhookService
 from app.services.whatsapp_service import WhatsAppService
 from app.services.instagram_service import InstagramService
 from app.services.oauth_login_service import OAuthLoginService
+from app.services.telegram_service import TelegramService
 
 
 @lru_cache(maxsize=1)
@@ -94,6 +95,7 @@ def get_webhook_service() -> WebhookService:
         agent=get_agent_service(),
         whatsapp=WhatsAppService(get_settings()),
         instagram=InstagramService(get_settings()),
+        telegram=TelegramService(get_settings()),
     )
 
 

@@ -116,3 +116,86 @@ The repo contains both a FastAPI backend at the root and a Next app under `front
 ## Not yet reviewed (next pass)
 - Alembic migrations vs current `app/repositories/models.py`
 - Full production deploy rehearsal on Heroku
+
+---
+
+## Scan findings - 2026-06-13
+
+### 23. Registration contract regressed: backend no longer accepts `name`, but UI and schema example still imply it
+Observed across:
+- `app/schemas/api.py:17`
+- `app/api/routes/auth.py:57`
+- `app/services/auth_service.py:77`
+- `frontend/src/app/register/page.tsx:9`
+
+`VendorRegisterRequest` only accepts `email` and `password`, but its schema example still includes `name`. The frontend register page also only stores `{ email, password }`, and `AuthService.register()` now derives `name` from the email prefix (`email.split("@", 1)[0]`). Result: vendor records are created with synthetic names even though the product/UI contract still suggests the user should choose a business name. This is a real behavior change, not just a doc typo.
+
+Impact:
+- New vendor records get poor default names.
+- API docs and product expectations are misleading.
+- If the intended product flow still requires a business/store name at signup, that capability is currently gone.
+
+Fix options:
+- Restore a required `name` field end to end in the backend and frontend.
+- Or explicitly make name collection a later profile-completion step and remove the stale schema example / UI assumptions.
+
+### 24. Instagram vendor messages are misclassified as customer messages
+Observed at:
+- `app/services/webhook_service.py:218`
+
+`WebhookService._is_vendor_sender()` handles Telegram specially, then falls back to comparing `message.from_number` against `vendor["whatsapp_number"]` for every other platform. That means Instagram messages from the vendor account are never recognized as vendor-originated, because Instagram sender IDs are compared against a WhatsApp phone number.
+
+Impact:
+- Vendor Instagram replies can be treated as customer messages.
+- The bot can respond to the vendor as if they were the customer.
+- Contact-save side effects, conversation-state updates, and order-state transitions can be applied to the wrong actor.
+
+Fix:
+- Add an Instagram-specific sender check using Instagram identifiers.
+- Avoid using the WhatsApp fallback for non-WhatsApp platforms.
+
+### 25. Instagram approval prompts are addressed to the page/account itself, not to a reachable vendor recipient
+Observed at:
+- `app/services/webhook_service.py:129`
+- `app/services/webhook_service.py:210`
+
+For Instagram, `_vendor_recipient_id()` returns `vendor["instagram_page_id"]`. Later, vendor approval prompts (`decision.vendor_buttons` / `decision.vendor_text`) are sent to that value. But Instagram messaging targets a user/IGSID conversation recipient, not the business page/account ID as an approval inbox. There is no separate vendor-recipient concept stored for Instagram, so these approval prompts have no valid destination.
+
+Impact:
+- Checkout approval requests for Instagram conversations will not reach the vendor correctly.
+- The system appears to support vendor approval on Instagram, but the routing target is wrong.
+
+Fix options:
+- Introduce a real vendor recipient/channel for Instagram approvals.
+- Or disable vendor-approval prompts on Instagram until there is a valid approval destination.
+
+### 26. Telegram "connected" status is misleading because it ignores missing vendor chat binding
+Observed at:
+- `app/api/routes/vendor_admin.py:429`
+
+`_telegram_credentials_response()` marks Telegram as connected when `telegram_bot_token` exists. But outbound vendor-side notifications and approval prompts still depend on `telegram_vendor_chat_id`. If only the token is saved, the UI reports success while real approval flows can still fail or be skipped.
+
+Impact:
+- Vendors can believe Telegram is fully configured when only half the setup is done.
+- Approval prompts and vendor notifications may silently never arrive.
+
+Fix:
+- Make `connected` reflect the minimum configuration actually needed for the supported flows.
+- At minimum, distinguish between "bot token saved" and "vendor chat linked".
+
+### 27. Settings UI cannot clear saved WhatsApp or Telegram credentials
+Observed across:
+- `frontend/src/app/(main)/settings/page.tsx:145`
+- `frontend/src/app/(main)/settings/page.tsx:168`
+- `app/repositories/sql.py:251`
+- `app/repositories/sql.py:287`
+
+The settings page only sends non-empty fields when saving. Blank values are omitted from the request payload. On the backend, the repository update methods only write fields when the incoming value is not `None`. Combined effect: once a WhatsApp token, WhatsApp phone number ID, Telegram bot token, or Telegram vendor chat ID is saved, this UI/API path cannot remove it.
+
+Impact:
+- Credentials cannot be revoked or corrected through the current admin UI if the user needs to clear a wrong value first.
+- Operational cleanup and provider switching are harder than they should be.
+
+Fix options:
+- Allow explicit null/empty-field clearing semantics in the API.
+- Add dedicated disconnect/clear actions in the UI for sensitive credentials.

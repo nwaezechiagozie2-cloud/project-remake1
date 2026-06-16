@@ -13,6 +13,7 @@ from app.api.deps import (
     get_settings_repo,
     get_vendor_repo,
 )
+from app.config import get_settings
 from app.exceptions import AuthorizationError, ResourceNotFoundError, ValidationError
 from app.schemas.api import (
     BusinessInfoCreateRequest,
@@ -29,12 +30,16 @@ from app.schemas.api import (
     ProductCreateRequest,
     ProductListResponse,
     ProductResponse,
+    TelegramCredentialsRequest,
+    TelegramCredentialsResponse,
     ProductUpdateRequest,
     VendorCatalogueResponse,
     VendorCatalogueUpdateRequest,
     VendorDashboardResponse,
     VendorSettingsResponse,
     VendorSettingsUpdateRequest,
+    WhatsAppCredentialsRequest,
+    WhatsAppCredentialsResponse,
 )
 from app.services.catalogue_ingestion_service import CatalogueIngestionService
 
@@ -341,3 +346,122 @@ async def get_instagram_credentials(
         connected=bool(page_id and vendor.get("instagram_page_token")),
         message="Instagram is connected." if page_id else "Instagram is not connected.",
     )
+
+
+@router.put("/{vendor_id}/whatsapp-credentials", dependencies=[Depends(_authorize_vendor_scope)], response_model=WhatsAppCredentialsResponse)
+async def update_whatsapp_credentials(
+    vendor_id: int,
+    payload: WhatsAppCredentialsRequest,
+    vendors=Depends(get_vendor_repo),
+) -> WhatsAppCredentialsResponse:
+    if not any(
+        value is not None
+        for value in (
+            payload.whatsapp_number,
+            payload.whatsapp_token,
+            payload.whatsapp_phone_number_id,
+        )
+    ):
+        raise ValidationError("At least one WhatsApp credential field is required")
+
+    await _ensure_vendor(vendor_id, vendors)
+    updated = await vendors.update_whatsapp_credentials(
+        vendor_id,
+        whatsapp_number=payload.whatsapp_number,
+        whatsapp_token=payload.whatsapp_token,
+        whatsapp_phone_number_id=payload.whatsapp_phone_number_id,
+    )
+    if not updated:
+        raise ResourceNotFoundError("Vendor not found")
+    return _whatsapp_credentials_response(updated, "WhatsApp credentials saved successfully.")
+
+
+@router.get("/{vendor_id}/whatsapp-credentials", dependencies=[Depends(_authorize_vendor_scope)], response_model=WhatsAppCredentialsResponse)
+async def get_whatsapp_credentials(
+    vendor_id: int,
+    vendors=Depends(get_vendor_repo),
+) -> WhatsAppCredentialsResponse:
+    vendor = await _ensure_vendor(vendor_id, vendors)
+    return _whatsapp_credentials_response(vendor)
+
+
+def _whatsapp_credentials_response(vendor: dict, message: str | None = None) -> WhatsAppCredentialsResponse:
+    phone_number = vendor.get("whatsapp_number")
+    phone_number_id = vendor.get("whatsapp_phone_number_id")
+    has_access_token = bool(vendor.get("whatsapp_token"))
+    connected = bool(phone_number and phone_number_id and has_access_token)
+    return WhatsAppCredentialsResponse(
+        whatsapp_number=phone_number,
+        whatsapp_phone_number_id=phone_number_id,
+        has_access_token=has_access_token,
+        connected=connected,
+        webhook_url="/webhook",
+        message=message or ("WhatsApp is connected." if connected else "WhatsApp is not connected."),
+    )
+
+
+@router.put("/{vendor_id}/telegram-credentials", dependencies=[Depends(_authorize_vendor_scope)], response_model=TelegramCredentialsResponse)
+async def update_telegram_credentials(
+    vendor_id: int,
+    payload: TelegramCredentialsRequest,
+    vendors=Depends(get_vendor_repo),
+) -> TelegramCredentialsResponse:
+    await _ensure_vendor(vendor_id, vendors)
+    updated = await vendors.update_telegram_credentials(
+        vendor_id,
+        bot_token=payload.telegram_bot_token,
+        vendor_chat_id=payload.telegram_vendor_chat_id,
+    )
+    if not updated:
+        raise ResourceNotFoundError("Vendor not found")
+    return _telegram_credentials_response(updated)
+
+
+@router.get("/{vendor_id}/telegram-credentials", dependencies=[Depends(_authorize_vendor_scope)], response_model=TelegramCredentialsResponse)
+async def get_telegram_credentials(
+    vendor_id: int,
+    vendors=Depends(get_vendor_repo),
+) -> TelegramCredentialsResponse:
+    vendor = await _ensure_vendor(vendor_id, vendors)
+    return _telegram_credentials_response(vendor)
+
+
+def _telegram_credentials_response(vendor: dict) -> TelegramCredentialsResponse:
+    has_bot_token = bool(vendor.get("telegram_bot_token"))
+    chat_id = vendor.get("telegram_vendor_chat_id")
+    return TelegramCredentialsResponse(
+        telegram_vendor_chat_id=chat_id,
+        has_bot_token=has_bot_token,
+        connected=has_bot_token,
+        webhook_url="/telegram/webhook",
+        message="Telegram is connected." if has_bot_token else "Telegram is not connected.",
+    )
+
+
+@router.post("/{vendor_id}/telegram-webhook", dependencies=[Depends(_authorize_vendor_scope)])
+async def configure_telegram_webhook(
+    vendor_id: int,
+    vendors=Depends(get_vendor_repo),
+) -> dict:
+    vendor = await _ensure_vendor(vendor_id, vendors)
+    token = vendor.get("telegram_bot_token") or get_settings().telegram_bot_token
+    if not token:
+        raise ValidationError("Telegram bot token is not configured")
+
+    settings = get_settings()
+    webhook_url = f"{settings.public_api_base_url.rstrip('/')}/telegram/webhook"
+    if "localhost" in webhook_url or "127.0.0.1" in webhook_url:
+        raise ValidationError("Set PUBLIC_API_BASE_URL to the public backend base URL before configuring Telegram webhook")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.post(
+            f"https://api.telegram.org/bot{token}/setWebhook",
+            json={
+                "url": webhook_url,
+                "secret_token": settings.telegram_webhook_secret or None,
+                "allowed_updates": ["message", "edited_message", "callback_query"],
+            },
+        )
+    if response.status_code >= 400:
+        raise ValidationError("Telegram setWebhook failed", details={"body": response.text[:500]})
+    return {"status": "ok", "webhook_url": webhook_url}
