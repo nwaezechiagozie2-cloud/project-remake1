@@ -9,6 +9,7 @@ from app.config import Settings
 from app.domain.interfaces import VendorRepository
 from app.exceptions import ResourceNotFoundError, ValidationError
 from app.observability import get_metrics_registry
+from app.services.oauth_login_service import INSTAGRAM_OAUTH_SCOPES
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,8 @@ class InstagramOAuthService:
                 "client_id": self.settings.instagram_client_id,
                 "redirect_uri": self.settings.instagram_redirect_uri,
                 "response_type": "code",
-                "scope": "instagram_business_basic,instagram_business_manage_messages",
+                "scope": INSTAGRAM_OAUTH_SCOPES,
+                "force_reauth": "true",
                 "state": state,
             }
         )

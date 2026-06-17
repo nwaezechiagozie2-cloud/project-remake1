@@ -5,6 +5,9 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { GoogleIcon, InstagramIcon } from "@/components/brand-icons";
 import { API_ROOT, apiClient, getApiErrorMessage } from "@/lib/api";
 
+const INSTAGRAM_OAUTH_URL =
+  "https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=2049636778952216&redirect_uri=https://one-tap-closer-dbd309d28017.herokuapp.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+
 export default function LoginPage() {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
@@ -33,6 +36,10 @@ export default function LoginPage() {
   }
 
   const handleOAuth = (provider: "google" | "instagram") => {
+    if (provider === "instagram") {
+      window.location.href = INSTAGRAM_OAUTH_URL;
+      return;
+    }
     window.location.href = `${API_ROOT}/auth/login/${provider}`;
   };
 

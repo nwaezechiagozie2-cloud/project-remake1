@@ -896,6 +896,7 @@ class SQLBusinessInfoRepository:
             row = VendorBusinessInfo(vendor_id=vendor_id, **payload)
             session.add(row)
             await session.flush()
+            await session.refresh(row)
             return {
                 "id": row.id,
                 "title": row.title,

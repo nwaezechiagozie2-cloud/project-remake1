@@ -10,6 +10,13 @@ from app.exceptions import ValidationError
 from app.services.auth_service import AuthService
 
 OAUTH_STATE_TTL_MINUTES = 10
+INSTAGRAM_OAUTH_SCOPES = (
+    "instagram_business_basic,"
+    "instagram_business_manage_messages,"
+    "instagram_business_manage_comments,"
+    "instagram_business_content_publish,"
+    "instagram_business_manage_insights"
+)
 
 
 class OAuthLoginService:
@@ -111,7 +118,8 @@ class OAuthLoginService:
                 "client_id": self.settings.instagram_client_id,
                 "redirect_uri": self.settings.instagram_login_redirect_uri,
                 "response_type": "code",
-                "scope": "instagram_business_basic,instagram_business_manage_messages",
+                "scope": INSTAGRAM_OAUTH_SCOPES,
+                "force_reauth": "true",
                 "state": state,
             }
         )
