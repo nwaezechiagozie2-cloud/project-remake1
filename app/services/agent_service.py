@@ -55,6 +55,12 @@ class AgentService:
     async def _handle_customer_message(self, vendor: dict, message: ParsedInboundMessage) -> AgentDecision:
         if message.platform == "instagram":
             customer = await self._customers.get_or_create_by_instagram(message.from_number, message.profile_name)
+        elif message.platform == "telegram":
+            customer = await self._customers.get_or_create_by_telegram(
+                telegram_id=message.from_number,
+                chat_id=str((message.raw.get("chat") or {}).get("id") or message.from_number),
+                display_name=message.profile_name,
+            )
         else:
             customer = await self._customers.get_or_create_by_whatsapp(message.from_number, message.profile_name)
         customer_id = customer["id"]
@@ -81,7 +87,7 @@ class AgentService:
                     order_status="INQUIRY",
                 )
 
-            platform_prefix = "ig" if message.platform == "instagram" else "wa"
+            platform_prefix = {"instagram": "ig", "telegram": "tg"}.get(message.platform, "wa")
             thread_id = f"{vendor['id']}_{platform_prefix}_{message.from_number}"
 
             result = await run_customer_agent(
