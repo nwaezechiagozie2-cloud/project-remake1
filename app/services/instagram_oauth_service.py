@@ -1,24 +1,27 @@
 import logging
 import os
-import secrets
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode, urlparse
 
 import httpx
+import jwt
 
 from app.config import Settings
 from app.domain.interfaces import VendorRepository
 from app.exceptions import ResourceNotFoundError, ValidationError
 from app.observability import get_metrics_registry
+from app.services.auth_service import AuthService
 from app.services.oauth_login_service import INSTAGRAM_OAUTH_SCOPES
 
 logger = logging.getLogger(__name__)
+INSTAGRAM_CONNECT_STATE_TTL_MINUTES = 10
 
 
 class InstagramOAuthService:
-    def __init__(self, settings: Settings, vendors: VendorRepository) -> None:
+    def __init__(self, settings: Settings, vendors: VendorRepository, auth: AuthService) -> None:
         self.settings = settings
         self.vendors = vendors
-        self._states: dict[str, int] = {}
+        self.auth = auth
 
     def _allow_localhost_oauth(self) -> None:
         parsed_redirect_uri = urlparse(self.settings.instagram_redirect_uri)
@@ -29,6 +32,36 @@ class InstagramOAuthService:
         if not (self.settings.instagram_client_id and self.settings.instagram_app_secret):
             raise ValidationError("Instagram OAuth not configured")
 
+    def _issue_connect_state(self, vendor_id: int) -> str:
+        payload = {
+            "provider": "instagram",
+            "purpose": "instagram_connect",
+            "vendor_id": vendor_id,
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=INSTAGRAM_CONNECT_STATE_TTL_MINUTES),
+        }
+        return jwt.encode(payload, self.settings.jwt_secret, algorithm=self.settings.jwt_algorithm)
+
+    def _decode_connect_state(self, state: str) -> int:
+        try:
+            payload = jwt.decode(state, self.settings.jwt_secret, algorithms=[self.settings.jwt_algorithm])
+        except Exception as exc:
+            raise ValidationError("Invalid or expired OAuth state") from exc
+        if payload.get("provider") != "instagram" or payload.get("purpose") != "instagram_connect":
+            raise ValidationError("Invalid or expired OAuth state")
+        vendor_id = payload.get("vendor_id")
+        if not isinstance(vendor_id, int):
+            raise ValidationError("Invalid or expired OAuth state")
+        return vendor_id
+
+    def _frontend_complete_url(self, auth_payload: dict) -> str:
+        params = urlencode(
+            {
+                "token": auth_payload["token"],
+                "vendor_id": str(auth_payload["vendor_id"]),
+            }
+        )
+        return f"{self.settings.frontend_base_url.rstrip('/')}/auth/complete#{params}"
+
     async def build_authorization_url(self, vendor_id: int) -> str:
         vendor = await self.vendors.get_by_id(vendor_id)
         if not vendor:
@@ -37,9 +70,6 @@ class InstagramOAuthService:
         self._require_config()
         self._allow_localhost_oauth()
 
-        state = f"{vendor_id}:{secrets.token_hex(16)}"
-        self._states[state] = vendor_id
-
         params = urlencode(
             {
                 "client_id": self.settings.instagram_client_id,
@@ -47,29 +77,14 @@ class InstagramOAuthService:
                 "response_type": "code",
                 "scope": INSTAGRAM_OAUTH_SCOPES,
                 "force_reauth": "true",
-                "state": state,
+                "state": self._issue_connect_state(vendor_id),
             }
         )
         return f"https://www.instagram.com/oauth/authorize?{params}"
 
-    async def complete_callback(self, code: str, state: str) -> dict:
+    async def complete_callback(self, code: str, state: str | None = None) -> str:
         if not code:
             raise ValidationError("Missing authorization code")
-        if not state or ":" not in state:
-            raise ValidationError("Missing vendor state")
-
-        vendor_id_text, _ = state.split(":", 1)
-        try:
-            vendor_id = int(vendor_id_text)
-        except ValueError as exc:
-            raise ValidationError("Invalid vendor state") from exc
-
-        if self._states.pop(state, None) != vendor_id:
-            raise ValidationError("Invalid or expired OAuth state")
-
-        vendor = await self.vendors.get_by_id(vendor_id)
-        if not vendor:
-            raise ResourceNotFoundError("Vendor not found")
 
         token_response = await self._exchange_code(code)
         access_token = token_response.get("access_token")
@@ -82,6 +97,28 @@ class InstagramOAuthService:
         if not ig_user_id:
             raise ValidationError("Could not resolve Instagram user ID from access token")
 
+        if not state:
+            auth_payload = await self.auth.login_or_create_with_instagram(
+                instagram_user_id=ig_user_id,
+                username=ig_user.get("username"),
+            )
+            vendor_id = int(auth_payload["vendor_id"])
+            updated = await self.vendors.update_instagram_credentials(
+                vendor_id,
+                page_id=ig_user_id,
+                page_token=access_token,
+            )
+            if not updated:
+                raise ResourceNotFoundError("Vendor not found")
+            await self._subscribe_messages(ig_user_id, access_token)
+            logger.info("instagram_oauth_login_callback_success | vendor_id=%s", vendor_id)
+            return self._frontend_complete_url(auth_payload)
+
+        vendor_id = self._decode_connect_state(state)
+        vendor = await self.vendors.get_by_id(vendor_id)
+        if not vendor:
+            raise ResourceNotFoundError("Vendor not found")
+
         updated = await self.vendors.update_instagram_credentials(
             vendor_id,
             page_id=ig_user_id,
@@ -92,11 +129,7 @@ class InstagramOAuthService:
 
         await self._subscribe_messages(ig_user_id, access_token)
         logger.info("instagram_oauth_callback_success | vendor_id=%s", vendor_id)
-        return {
-            "vendor_id": vendor_id,
-            "instagram_page_id": ig_user_id,
-            "username": ig_user.get("username"),
-        }
+        return f"{self.settings.frontend_base_url.rstrip('/')}/settings?instagram=connected"
 
     async def _exchange_code(self, code: str) -> dict:
         params = {

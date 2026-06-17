@@ -84,7 +84,7 @@ def get_google_oauth_service() -> GoogleOAuthService:
 
 @lru_cache(maxsize=1)
 def get_instagram_oauth_service() -> InstagramOAuthService:
-    return InstagramOAuthService(settings=get_settings(), vendors=get_vendor_repo())
+    return InstagramOAuthService(settings=get_settings(), vendors=get_vendor_repo(), auth=get_auth_service())
 
 
 def get_webhook_service() -> WebhookService:

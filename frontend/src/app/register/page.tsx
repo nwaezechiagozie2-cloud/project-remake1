@@ -4,9 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
 import { GoogleIcon, InstagramIcon } from "@/components/brand-icons";
 import { API_ROOT, apiClient, getApiErrorMessage } from "@/lib/api";
-
-const INSTAGRAM_OAUTH_URL =
-  "https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=2049636778952216&redirect_uri=https://one-tap-closer-dbd309d28017.herokuapp.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";
+import { INSTAGRAM_OAUTH_URL } from "@/lib/auth";
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ email: "", password: "" });

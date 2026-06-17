@@ -1,0 +1,2 @@
+export const INSTAGRAM_OAUTH_URL =
+  "https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=2049636778952216&redirect_uri=https://one-tap-closer-dbd309d28017.herokuapp.com/auth/instagram/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights";

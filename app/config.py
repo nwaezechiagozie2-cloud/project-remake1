@@ -48,7 +48,6 @@ class Settings(BaseSettings):
     instagram_api_version: str = Field(default="v22.0", alias="INSTAGRAM_API_VERSION")
     instagram_client_id: str = Field(default="", alias="INSTAGRAM_CLIENT_ID")
     instagram_redirect_uri: str = Field(default="http://localhost:8001/auth/instagram/callback", alias="INSTAGRAM_REDIRECT_URI")
-    instagram_login_redirect_uri: str = Field(default="http://localhost:8001/auth/login/instagram/callback", alias="INSTAGRAM_LOGIN_REDIRECT_URI")
 
     telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(default="", alias="TELEGRAM_WEBHOOK_SECRET")

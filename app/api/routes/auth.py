@@ -106,31 +106,6 @@ async def login_google_callback(
     return RedirectResponse(url=frontend_url)
 
 
-@router.get("/auth/login/instagram", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
-async def login_instagram(oauth_login: OAuthLoginService = Depends(get_oauth_login_service)):
-    authorization_url = await oauth_login.build_instagram_url()
-    logger.info("instagram_login_authorization_redirect")
-    return RedirectResponse(url=authorization_url)
-
-
-@router.get("/auth/login/instagram/callback")
-async def login_instagram_callback(
-    code: str | None = None,
-    state: str | None = None,
-    error: str | None = None,
-    error_description: str | None = None,
-    oauth_login: OAuthLoginService = Depends(get_oauth_login_service),
-):
-    if error:
-        raise ValidationError("Instagram login failed", details={"error": error, "description": error_description})
-    if not code or not state:
-        raise ValidationError("Missing Instagram login callback parameters")
-    frontend_url = await oauth_login.complete_instagram(code=code, state=state)
-    get_metrics_registry().increment("oauth_callbacks_total")
-    logger.info("instagram_login_callback_completed")
-    return RedirectResponse(url=frontend_url)
-
-
 @router.get("/auth/google", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
 async def auth_google(vendor_id: int, oauth_service: GoogleOAuthService = Depends(get_google_oauth_service)):
     authorization_url = await oauth_service.build_authorization_url(vendor_id)
@@ -184,11 +159,11 @@ async def auth_instagram_callback(
 ) -> RedirectResponse:
     if error:
         raise ValidationError("Instagram OAuth failed", details={"error": error, "description": error_description})
-    if not code or not state:
+    if not code:
         raise ValidationError("Missing OAuth callback parameters")
 
-    result = await oauth_service.complete_callback(code=code, state=state)
+    frontend_url = await oauth_service.complete_callback(code=code, state=state)
     get_metrics_registry().increment("oauth_callbacks_total")
-    logger.info("instagram_oauth_callback_completed | vendor_id=%s", result["vendor_id"])
+    logger.info("instagram_oauth_callback_completed")
 
-    return RedirectResponse(url=f"{oauth_service.settings.frontend_base_url.rstrip('/')}/settings?instagram=connected")
+    return RedirectResponse(url=frontend_url)
