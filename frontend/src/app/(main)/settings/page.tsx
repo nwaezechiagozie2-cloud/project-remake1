@@ -210,7 +210,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-white selection:bg-[#3B5EE4]/10 selection:text-[#3B5EE4]">
-      <div className="max-w-[780px] px-8 pt-10 pb-16 mx-auto">
+      <div className="max-w-[780px] px-4 pt-6 pb-16 mx-auto md:px-8 md:pt-10">
         <div className="mb-12">
           <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-gray-400 mb-1">Configuration</p>
           <h1 className="text-[24px] font-bold tracking-[-0.02em] text-gray-900">Settings</h1>
@@ -294,7 +294,7 @@ export default function SettingsPage() {
               <h2 className="text-[14px] font-bold text-gray-900">Instagram Integration</h2>
             </div>
 
-            <div className="p-5 bg-gray-50/50 border border-gray-100 rounded-2xl flex items-center justify-between">
+            <div className="p-5 bg-gray-50/50 border border-gray-100 rounded-2xl flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
                 <p className="text-[13px] font-bold text-gray-900">Instagram DMs</p>
                 <p className="text-[12px] text-gray-400 font-medium">
@@ -304,7 +304,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={handleInstagramConnect}
-                className="bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+                className="w-full bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 md:w-auto"
               >
                 <InstagramIcon />
                 Connect Instagram
@@ -377,7 +377,7 @@ export default function SettingsPage() {
               <h2 className="text-[14px] font-bold text-gray-900">Contact Integration</h2>
             </div>
 
-            <div className="p-5 bg-gray-50/50 border border-gray-100 rounded-2xl flex items-center justify-between">
+            <div className="p-5 bg-gray-50/50 border border-gray-100 rounded-2xl flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
                 <p className="text-[13px] font-bold text-gray-900">Google Contacts</p>
                 <p className="text-[12px] text-gray-400 font-medium">
@@ -387,7 +387,7 @@ export default function SettingsPage() {
               {googleStatus === "connected" ? (
                 <button
                   onClick={handleGoogleDisconnect}
-                  className="bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
+                  className="w-full bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center justify-center gap-2 md:w-auto"
                 >
                   <GoogleIcon />
                   Disconnect
@@ -395,7 +395,7 @@ export default function SettingsPage() {
               ) : (
                 <button
                   onClick={handleGoogleConnect}
-                  className="bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
+                  className="w-full bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center justify-center gap-2 md:w-auto"
                 >
                   <GoogleIcon />
                   Continue with Google

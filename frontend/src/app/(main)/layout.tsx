@@ -44,10 +44,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  const settingsActive = path === "/settings" || path.startsWith("/settings/");
+
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-white pb-[72px] md:pb-0">
       {/* Sidebar — full height, clean border, no background box */}
-      <aside className="w-[72px] border-r border-gray-100 flex flex-col items-center py-6 gap-3 shrink-0 sticky top-0 h-screen">
+      <aside className="hidden md:flex w-[72px] border-r border-gray-100 flex-col items-center py-6 gap-3 shrink-0 sticky top-0 h-screen">
         {/* Logo mark */}
         <Link href="/" className="w-9 h-9 mb-4 rounded-full bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 flex items-center justify-center text-white font-black text-[15px] shrink-0 shadow-[0_4px_12px_rgba(15,23,42,0.35)]">
           O
@@ -76,12 +78,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             href="/settings"
             title="Settings"
             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
-              path === "/settings" || path.startsWith("/settings/")
+              settingsActive
                 ? "text-[#3B5EE4]"
                 : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
             }`}
           >
-            <Settings size={19} strokeWidth={path === "/settings" || path.startsWith("/settings/") ? 2 : 1.5} />
+            <Settings size={19} strokeWidth={settingsActive ? 2 : 1.5} />
           </Link>
           <button
             type="button"
@@ -98,6 +100,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         {children}
       </div>
+
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-gray-100 bg-white/95 backdrop-blur">
+        <div className="grid grid-cols-6 px-2 py-2">
+          {[...nav, { href: "/settings", icon: Settings, label: "Settings" }].map(({ href, icon: Icon, label }) => {
+            const active = path === href || path.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                className={`h-12 flex flex-col items-center justify-center gap-1 rounded-xl transition-colors ${
+                  active ? "text-[#3B5EE4] bg-[#EFF1FE]" : "text-gray-400"
+                }`}
+              >
+                <Icon size={18} strokeWidth={active ? 2 : 1.5} />
+                <span className="text-[9px] font-bold leading-none truncate max-w-full">{label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

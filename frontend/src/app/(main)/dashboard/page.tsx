@@ -14,7 +14,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-[780px] px-8 pt-10 pb-16 mx-auto">
+      <div className="max-w-[780px] px-4 pt-6 pb-16 mx-auto md:px-8 md:pt-10">
         <div className="mb-6">
           <p className="text-[11px] font-semibold tracking-[0.12em] uppercase text-gray-400 mb-1">
             Inbox

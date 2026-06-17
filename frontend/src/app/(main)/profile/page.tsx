@@ -179,7 +179,7 @@ export default function ProfilePage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-white">
-      <div className="max-w-[780px] px-8 pt-10 pb-16 mx-auto">
+      <div className="max-w-[780px] px-4 pt-6 pb-16 mx-auto md:px-8 md:pt-10">
         <div className="mb-10">
           <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-gray-400 mb-1">Account</p>
           <h1 className="text-[24px] font-bold tracking-[-0.02em] text-gray-900">Profile</h1>
@@ -208,7 +208,7 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {(["google", "instagram"] as const).map(provider => (
-                <div key={provider} className="p-4 border border-gray-100 rounded-2xl bg-gray-50/40 flex items-center justify-between">
+                <div key={provider} className="p-4 border border-gray-100 rounded-2xl bg-gray-50/40 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[13px] font-bold text-gray-900 capitalize">{provider}</p>
                     <p className="text-[12px] text-gray-400 font-medium">Login provider</p>
@@ -229,7 +229,7 @@ export default function ProfilePage() {
               <h2 className="text-[14px] font-bold text-gray-900">Email</h2>
             </div>
 
-            <div className="p-5 border border-gray-100 rounded-2xl bg-gray-50/40 flex items-center justify-between gap-4">
+            <div className="p-5 border border-gray-100 rounded-2xl bg-gray-50/40 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
               <div>
                 <p className="text-[13px] font-bold text-gray-900">{profile?.email}</p>
                 <p className="text-[12px] text-gray-400 font-medium">

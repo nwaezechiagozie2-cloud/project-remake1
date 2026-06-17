@@ -382,21 +382,21 @@ export default function ProductsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-white">
-      <div className="max-w-[860px] px-8 pt-10 pb-16 mx-auto">
-        <div className="flex items-center justify-between mb-8">
+      <div className="max-w-[860px] px-4 pt-6 pb-16 mx-auto md:px-8 md:pt-10">
+        <div className="flex flex-col items-start gap-4 mb-8 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.12em] uppercase text-gray-400 mb-1">Catalog</p>
             <h1 className="text-[22px] font-bold tracking-[-0.02em] text-gray-900">Products</h1>
             {error && <p className="mt-2 text-[12px] font-bold text-red-600">{error}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:items-center">
             <button
               onClick={() => setShowPasteModal(true)}
-              className="bg-white border border-gray-100 text-gray-700 text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm"
+              className="w-full bg-white border border-gray-100 text-gray-700 text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 shadow-sm sm:w-auto"
             >
               <ClipboardPaste size={16} /> Paste catalogue
             </button>
-            <label className="bg-white border border-gray-100 text-gray-700 text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2 cursor-pointer shadow-sm">
+            <label className="w-full bg-white border border-gray-100 text-gray-700 text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm sm:w-auto">
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
               Upload catalogue
               <input
@@ -409,7 +409,7 @@ export default function ProductsPage() {
             </label>
             <button
               onClick={openCreate}
-              className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 transition-colors flex items-center gap-2"
+              className="w-full bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 transition-colors flex items-center justify-center gap-2 sm:w-auto"
             >
               <Plus size={16} /> Add product
             </button>
@@ -417,7 +417,7 @@ export default function ProductsPage() {
         </div>
 
         <section className="mb-10">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col items-start gap-1 mb-4 md:flex-row md:items-center md:justify-between">
             <h2 className="text-[14px] font-bold text-gray-900">Catalogue uploads</h2>
             <p className="text-[12px] font-medium text-gray-400">Review parsed draft products before importing.</p>
           </div>
@@ -427,13 +427,13 @@ export default function ProductsPage() {
               <p className="text-[13px] text-gray-400 font-medium">No catalogue files or pasted text yet.</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-x-auto pb-1">
               {uploads.map(upload => (
                 <button
                   type="button"
                   key={upload.id}
                   onClick={() => selectUpload(upload.id)}
-                  className={`w-full grid grid-cols-12 items-center px-3 py-3 rounded-xl text-left transition-colors border ${
+                  className={`w-full min-w-[520px] grid grid-cols-12 items-center px-3 py-3 rounded-xl text-left transition-colors border md:min-w-0 ${
                     selectedUploadId === upload.id ? "border-[#3B5EE4]/30 bg-[#EFF1FE]/40" : "border-transparent hover:bg-gray-50"
                   }`}
                 >
@@ -459,17 +459,17 @@ export default function ProductsPage() {
 
           {selectedUploadId && (
             <div className="mt-5 border border-gray-100 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
+              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-[13px] font-bold text-gray-900">Parsed draft products</p>
                   <p className="text-[11px] font-bold text-gray-400">{selectedDrafts.length} of {importableDrafts.length} importable selected</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:items-center">
                   <button
                     type="button"
                     onClick={toggleAllDrafts}
                     disabled={importableDrafts.length === 0}
-                    className="text-[12px] font-bold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white"
+                    className="w-full text-[12px] font-bold px-3 py-2 rounded-lg border border-gray-200 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white sm:w-auto"
                   >
                     {allDraftsSelected ? "Unselect all" : "Select all"}
                   </button>
@@ -477,7 +477,7 @@ export default function ProductsPage() {
                     type="button"
                     onClick={handleImportSelected}
                     disabled={importing || selectedDrafts.length === 0}
-                    className="text-[12px] font-bold px-3 py-2 rounded-lg bg-gray-900 text-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    className="w-full text-[12px] font-bold px-3 py-2 rounded-lg bg-gray-900 text-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 sm:w-auto"
                   >
                     {importing ? <Loader2 size={13} className="animate-spin" /> : <PackageCheck size={13} />}
                     Import selected
@@ -489,9 +489,9 @@ export default function ProductsPage() {
                   <p className="text-[13px] text-gray-400 font-medium">No product candidates were parsed from this upload.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-100 overflow-x-auto">
                   {draftItems.map(item => (
-                    <div key={item.id} className="grid grid-cols-12 items-center px-4 py-3">
+                    <div key={item.id} className="min-w-[760px] grid grid-cols-12 items-center px-4 py-3 md:min-w-0">
                       <div className="col-span-1">
                         <input
                           type="checkbox"
@@ -557,7 +557,7 @@ export default function ProductsPage() {
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Search products..."
-              className="bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-[13px] font-medium text-gray-700 w-56 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30 focus:border-[#3B5EE4]/40 placeholder:text-gray-400 transition-all"
+              className="bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-[13px] font-medium text-gray-700 w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30 focus:border-[#3B5EE4]/40 placeholder:text-gray-400 transition-all"
             />
           </div>
           {(["all", "in", "out"] as const).map(value => (
@@ -574,7 +574,7 @@ export default function ProductsPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-12 px-3 py-2 border-b border-gray-100 mb-1">
+        <div className="hidden md:grid grid-cols-12 px-3 py-2 border-b border-gray-100 mb-1">
           <span className="col-span-5 text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">Product</span>
           <span className="col-span-2 text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em] text-right">Price</span>
           <span className="col-span-3 text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em] text-center">Availability</span>
@@ -595,21 +595,21 @@ export default function ProductsPage() {
               items.map(product => (
                 <div
                   key={product.id}
-                  className="grid grid-cols-12 items-center px-3 py-3.5 rounded-xl hover:bg-gray-50 transition-colors group"
+                  className="flex flex-col gap-3 px-3 py-3.5 rounded-xl hover:bg-gray-50 transition-colors group md:grid md:grid-cols-12 md:items-center"
                 >
-                  <div className="col-span-5 flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 md:col-span-5">
                     <ProductInitial name={product.name} />
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-gray-900 leading-tight truncate">{product.name}</p>
                       <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">{product.description || "No description"}</p>
                     </div>
                   </div>
-                  <div className="col-span-2 text-right">
+                  <div className="text-left md:col-span-2 md:text-right">
                     <span className="text-[13px] font-bold font-mono text-gray-900">
                       {product.currency} {product.price.toLocaleString()}
                     </span>
                   </div>
-                  <div className="col-span-3 flex justify-center">
+                  <div className="flex justify-start md:col-span-3 md:justify-center">
                     <button
                       type="button"
                       onClick={() => handleToggleAvailability(product)}
@@ -619,7 +619,7 @@ export default function ProductsPage() {
                       {product.in_stock ? "In Stock" : "Out of Stock"}
                     </button>
                   </div>
-                  <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex justify-start gap-1 opacity-100 transition-opacity md:col-span-2 md:justify-end md:opacity-0 md:group-hover:opacity-100">
                     <button
                       onClick={() => openEdit(product)}
                       className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
@@ -642,7 +642,7 @@ export default function ProductsPage() {
         )}
 
         {showModal && (
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-6">
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
                 <h2 className="text-[16px] font-bold text-gray-900">{editingProduct ? "Edit Product" : "Add New Product"}</h2>
@@ -651,11 +651,11 @@ export default function ProductsPage() {
                 </button>
               </div>
               <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <Field label="Product Name" value={form.name} onChange={value => setForm({ ...form, name: value })} placeholder="e.g. Leather Bag" />
                   <Field label="Price" type="number" value={form.price} onChange={value => setForm({ ...form, price: value })} placeholder="15000" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <Field label="Currency" value={form.currency} onChange={value => setForm({ ...form, currency: value.toUpperCase().slice(0, 3) })} placeholder="NGN" />
                   <label className="space-y-1.5">
                     <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Availability</span>
@@ -682,7 +682,7 @@ export default function ProductsPage() {
                 <Field label="Image URL" value={form.image_url} onChange={value => setForm({ ...form, image_url: value })} placeholder="https://..." />
                 <Field label="Video URL" value={form.video_url} onChange={value => setForm({ ...form, video_url: value })} placeholder="https://..." />
               </div>
-              <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+              <div className="px-6 py-4 bg-gray-50 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button onClick={() => setShowModal(false)} className="px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-gray-700">Cancel</button>
                 <button
                   onClick={handleSave}
@@ -698,7 +698,7 @@ export default function ProductsPage() {
         )}
 
         {showPasteModal && (
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-6">
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
                 <h2 className="text-[16px] font-bold text-gray-900">Paste catalogue text</h2>
@@ -724,7 +724,7 @@ export default function ProductsPage() {
                   />
                 </label>
               </div>
-              <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+              <div className="px-6 py-4 bg-gray-50 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button onClick={() => setShowPasteModal(false)} className="px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-gray-700">Cancel</button>
                 <button
                   onClick={handlePasteSubmit}

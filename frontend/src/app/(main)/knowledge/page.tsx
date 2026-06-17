@@ -161,15 +161,15 @@ export default function KnowledgePage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-white">
-      <div className="max-w-[860px] px-8 pt-10 pb-16 mx-auto">
-        <div className="flex items-center justify-between mb-8">
+      <div className="max-w-[860px] px-4 pt-6 pb-16 mx-auto md:px-8 md:pt-10">
+        <div className="flex flex-col items-start gap-4 mb-8 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.12em] uppercase text-gray-400 mb-1">AI Context</p>
             <h1 className="text-[22px] font-bold tracking-[-0.02em] text-gray-900">Business Information</h1>
             {error && <p className="mt-2 text-[12px] font-bold text-red-600">{error}</p>}
           </div>
-          <div className="flex items-center gap-2">
-            <label className="bg-white border border-gray-100 text-gray-700 text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2 cursor-pointer shadow-sm">
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:items-center">
+            <label className="w-full bg-white border border-gray-100 text-gray-700 text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm sm:w-auto">
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
               Upload file
               <input
@@ -182,7 +182,7 @@ export default function KnowledgePage() {
             </label>
             <button
               onClick={() => setShowAddModal(true)}
-              className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 transition-colors flex items-center gap-2"
+              className="w-full bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white text-[13px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#2B4DD0] hover:shadow-[#3B5EE4]/25 transition-colors flex items-center justify-center gap-2 sm:w-auto"
             >
               <Plus size={16} /> Add information
             </button>
@@ -197,12 +197,12 @@ export default function KnowledgePage() {
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Search info..."
-              className="bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-[13px] font-medium text-gray-700 w-56 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30 focus:border-[#3B5EE4]/40 placeholder:text-gray-400 transition-all"
+              className="bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-[13px] font-medium text-gray-700 w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30 focus:border-[#3B5EE4]/40 placeholder:text-gray-400 transition-all"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-12 px-3 py-2 border-b border-gray-100 mb-1">
+        <div className="hidden md:grid grid-cols-12 px-3 py-2 border-b border-gray-100 mb-1">
           <span className="col-span-8 text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">Information Block</span>
           <span className="col-span-2 text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">Type</span>
           <span className="col-span-2 flex justify-end"></span>
@@ -217,19 +217,19 @@ export default function KnowledgePage() {
             filteredItems.map(item => (
               <div
                 key={item.id}
-                className="grid grid-cols-12 items-center px-3 py-3.5 rounded-xl hover:bg-gray-50 transition-colors group"
+                className="flex items-start gap-3 px-3 py-3.5 rounded-xl hover:bg-gray-50 transition-colors group md:grid md:grid-cols-12 md:items-center"
               >
-                <div className="col-span-8 flex items-center gap-3 min-w-0">
+                <div className="flex flex-1 items-center gap-3 min-w-0 md:col-span-8">
                   <TopicIcon type={item.source_type} />
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-gray-900 leading-tight truncate">{item.title}</p>
                     <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate max-w-[420px]">{item.content}</p>
                   </div>
                 </div>
-                <div className="col-span-2">
+                <div className="hidden md:block md:col-span-2">
                   <span className="text-[12px] font-medium text-gray-500">{item.source_type}</span>
                 </div>
-                <div className="col-span-2 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex justify-end opacity-100 transition-opacity md:col-span-2 md:opacity-0 md:group-hover:opacity-100">
                   <button
                     onClick={() => handleDelete(item.id)}
                     className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"

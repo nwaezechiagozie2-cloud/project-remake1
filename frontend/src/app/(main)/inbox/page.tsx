@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Search, MessageCircle, Send } from "lucide-react";
+import { ArrowLeft, Search, MessageCircle, Send } from "lucide-react";
 
 type Chat = {
   id: string;
@@ -38,10 +38,10 @@ export default function InboxPage() {
   const selectedChat = chats.find(c => c.id === selectedChatId) || null;
 
   return (
-    <div className="flex w-full h-screen overflow-hidden text-gray-800 bg-white">
+    <div className="flex w-full h-[calc(100vh-72px)] overflow-hidden text-gray-800 bg-white md:h-screen">
 
       {/* ── Left panel: vendor + chat list ── */}
-      <div className="w-[300px] border-r border-gray-100 flex flex-col shrink-0">
+      <div className={`${selectedChat ? "hidden md:flex" : "flex"} w-full border-r border-gray-100 flex-col shrink-0 md:w-[300px]`}>
         <div className="px-6 pt-8 pb-5 border-b border-gray-100 flex flex-col items-center text-center">
           <Avatar name={vendorName} size="lg" />
           <h2 className="mt-3 text-[15px] font-bold text-gray-900 tracking-tight truncate max-w-full">{vendorName}</h2>
@@ -93,13 +93,23 @@ export default function InboxPage() {
       </div>
 
       {/* ── Center: chat window ── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`${selectedChat ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`}>
         {selectedChat ? (
           <>
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-              <div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedChatId(null)}
+                  className="w-9 h-9 rounded-xl border border-gray-100 flex items-center justify-center text-gray-500 md:hidden"
+                  aria-label="Back to chats"
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                <div>
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.1em] mb-0.5">Chat with</p>
                 <h2 className="text-[16px] font-bold text-gray-900 tracking-tight">{selectedChat.name}</h2>
+                </div>
               </div>
             </div>
 

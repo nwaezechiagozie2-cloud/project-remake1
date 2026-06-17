@@ -43,7 +43,7 @@ class AgentService:
             return await self._handle_vendor_button(vendor, text)
 
         # --- AI-LEVEL: Customer natural language ---
-        if not is_vendor_sender:
+        if not is_vendor_sender or message.platform == "telegram":
             return await self._handle_customer_message(vendor, message)
 
         # --- SYSTEM-LEVEL: Vendor sends a free-text message ---
