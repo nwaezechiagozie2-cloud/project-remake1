@@ -110,7 +110,7 @@ class AgentService:
                 order_status=result["order_status"],
             )
 
-            if result["order_status"] == "WAITING_VENDOR_CHECKOUT_APPROVAL":
+            if result.get("checkout_requested"):
                 confirm = bool(vendor_settings.get("confirm_before_sending_account_details", False))
                 if confirm:
                     decision.vendor_text = f"Customer {message.from_number} wants to make a purchase. Approve checkout?"

@@ -117,7 +117,12 @@ def create_nodes():
         # Following ANTIGRAVITY.md production efficiency rule.
         all_messages = state["messages"]
         if len(all_messages) > 10:
-            all_messages = all_messages[-10:]
+            slice_start = len(all_messages) - 10
+            for idx in range(slice_start, len(all_messages)):
+                if isinstance(all_messages[idx], HumanMessage):
+                    slice_start = idx
+                    break
+            all_messages = all_messages[slice_start:]
 
         prompt = [SystemMessage(content=build_system_prompt(config["configurable"].get("vendor_settings")))] + all_messages
         
@@ -237,22 +242,34 @@ async def run_customer_agent(
         customer_text = "I'm here — could you tell me a bit more about what you're looking for?"
 
     customer_media = None
-    new_order_status = final_state.get("order_status") or "INQUIRY"
+    new_order_status = final_state.get("order_status") or order_status or "INQUIRY"
+    checkout_requested = False
 
-    for m in reversed(final_state["messages"]):
+    # Inspect ONLY the messages generated in the current turn (from the latest HumanMessage onwards)
+    latest_human_idx = -1
+    for i in range(len(messages) - 1, -1, -1):
+        if isinstance(messages[i], HumanMessage):
+            latest_human_idx = i
+            break
+
+    current_turn_messages = messages[latest_human_idx:] if latest_human_idx != -1 else messages
+
+    for m in reversed(current_turn_messages):
         if m.type == "tool" and isinstance(m.content, str):
-            if "CATALOGUE_MEDIA|" in m.content:
+            if "CATALOGUE_MEDIA|" in m.content and not customer_media:
                 parts = m.content.split("|")
                 if len(parts) >= 3:
                     customer_media = {"kind": parts[1], "document_id": parts[2]}
             if "SIGNAL:CHECKOUT_REQUESTED" in m.content:
                 new_order_status = "WAITING_VENDOR_CHECKOUT_APPROVAL"
+                checkout_requested = True
                 break
 
     return {
         "response_text": customer_text,
         "customer_media": customer_media,
-        "order_status": new_order_status
+        "order_status": new_order_status,
+        "checkout_requested": checkout_requested,
     }
 
 
