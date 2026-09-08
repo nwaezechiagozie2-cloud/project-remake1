@@ -20,5 +20,6 @@ class AgentDecision:
     vendor_text: str | None = None
     customer_target_number: str | None = None
     vendor_buttons: list[dict] | None = None
+    order_details: str | None = None
     order_status: str = "INQUIRY"
 

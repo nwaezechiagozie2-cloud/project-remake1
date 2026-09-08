@@ -236,6 +236,7 @@ async def run_customer_agent(
 
     new_order_status = final_state.get("order_status") or order_status or "INQUIRY"
     checkout_requested = False
+    order_details = None
 
     # Inspect ONLY the messages generated in the current turn (from the latest HumanMessage onwards)
     latest_human_idx = -1
@@ -251,13 +252,23 @@ async def run_customer_agent(
             if "SIGNAL:CHECKOUT_REQUESTED" in m.content:
                 new_order_status = "WAITING_VENDOR_CHECKOUT_APPROVAL"
                 checkout_requested = True
+                order_details = _extract_order_details(m.content) or incoming_message.strip()
                 break
 
     return {
         "response_text": customer_text,
         "order_status": new_order_status,
         "checkout_requested": checkout_requested,
+        "order_details": order_details if checkout_requested else None,
     }
+
+
+def _extract_order_details(tool_content: str) -> str | None:
+    """Pull the ORDER:{...} segment the checkout tool echoes back, if present."""
+    for part in tool_content.split("|"):
+        if part.startswith("ORDER:"):
+            return part[len("ORDER:"):].strip() or None
+    return None
 
 
 _MD_BOLD = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)

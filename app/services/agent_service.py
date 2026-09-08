@@ -99,6 +99,7 @@ class AgentService:
             decision = AgentDecision(
                 customer_text=result["response_text"],
                 order_status=result["order_status"],
+                order_details=result.get("order_details"),
             )
 
             if result.get("checkout_requested"):

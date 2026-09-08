@@ -1,8 +1,13 @@
+"""Google OAuth flow for the Sheets integration.
+
+Mirrors GoogleOAuthService but for the spreadsheets scope — a separate consent,
+so tokens live in their own table (vendor_google_sheets_tokens). Vendors can
+connect any Google account and disconnect/reconnect to switch accounts.
+"""
 import asyncio
 import json
 import logging
 import os
-import secrets
 from urllib.parse import urlparse
 
 from google.auth.transport.requests import Request as GoogleRequest
@@ -10,28 +15,27 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 
 from app.config import Settings
-from app.domain.interfaces import GoogleTokenRepository, VendorRepository
+from app.domain.interfaces import GoogleSheetsTokenRepository, VendorRepository
 from app.exceptions import ResourceNotFoundError, ValidationError
 from app.observability import get_metrics_registry
+from app.services.google_oauth_service import GoogleOAuthService
 
-SCOPES = [
-    "openid",
+SHEETS_SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/userinfo.profile",
-    "https://www.googleapis.com/auth/contacts",
 ]
 
 logger = logging.getLogger(__name__)
 
 
-class GoogleOAuthService:
-    def __init__(self, settings: Settings, vendors: VendorRepository, tokens: GoogleTokenRepository) -> None:
+class GoogleSheetsOAuthService:
+    def __init__(self, settings: Settings, vendors: VendorRepository, tokens: GoogleSheetsTokenRepository) -> None:
         self.settings = settings
         self.vendors = vendors
         self.tokens = tokens
 
     def _allow_localhost_oauth(self) -> None:
-        parsed_redirect_uri = urlparse(self.settings.google_redirect_uri)
+        parsed_redirect_uri = urlparse(self.settings.google_sheets_redirect_uri)
         if parsed_redirect_uri.scheme == "http" and parsed_redirect_uri.hostname in {"localhost", "127.0.0.1"}:
             os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
@@ -46,33 +50,12 @@ class GoogleOAuthService:
                 "client_secret": self.settings.google_client_secret,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [self.settings.google_redirect_uri],
+                "redirect_uris": [self.settings.google_sheets_redirect_uri],
             }
         }
-        flow = Flow.from_client_config(client_config, scopes=SCOPES)
-        flow.redirect_uri = self.settings.google_redirect_uri
+        flow = Flow.from_client_config(client_config, scopes=SHEETS_SCOPES)
+        flow.redirect_uri = self.settings.google_sheets_redirect_uri
         return flow
-
-    @staticmethod
-    def _build_state(vendor_id: int, code_verifier: str | None = None) -> str:
-        state_parts = [str(vendor_id), secrets.token_hex(16)]
-        if code_verifier:
-            state_parts.append(code_verifier)
-        return ":".join(state_parts)
-
-    @staticmethod
-    def _parse_state(state: str) -> tuple[int, str | None]:
-        if not state or ":" not in state:
-            raise ValidationError("Missing vendor state")
-
-        parts = state.split(":")
-        try:
-            vendor_id = int(parts[0])
-        except ValueError as exc:
-            raise ValidationError("Invalid vendor state") from exc
-
-        code_verifier = parts[2] if len(parts) >= 3 and parts[2] else None
-        return vendor_id, code_verifier
 
     async def build_authorization_url(self, vendor_id: int) -> str:
         vendor = await self.vendors.get_by_id(vendor_id)
@@ -80,10 +63,7 @@ class GoogleOAuthService:
             raise ResourceNotFoundError("Vendor not found")
 
         flow = self._build_flow()
-        flow.autogenerate_code_verifier = True
-        code_verifier = secrets.token_urlsafe(64)[:96]
-        flow.code_verifier = code_verifier
-        oauth_state = self._build_state(vendor_id, code_verifier)
+        oauth_state = GoogleOAuthService._build_state(vendor_id)
         authorization_url, _ = flow.authorization_url(
             access_type="offline",
             include_granted_scopes="true",
@@ -97,27 +77,28 @@ class GoogleOAuthService:
         if not code:
             raise ValidationError("Missing authorization code")
 
-        vendor_id, code_verifier = self._parse_state(state)
+        vendor_id, _code_verifier = GoogleOAuthService._parse_state(state)
 
         if not await self.vendors.get_by_id(vendor_id):
             raise ResourceNotFoundError("Vendor not found")
 
         flow = self._build_flow()
-        if code_verifier:
-            flow.code_verifier = code_verifier
 
         try:
             await asyncio.to_thread(flow.fetch_token, authorization_response=authorization_response)
             credentials = flow.credentials
+            if not credentials.refresh_token:
+                raise ValidationError(
+                    "Google did not return a refresh token. Disconnect the integration and reconnect with consent."
+                )
             await self.tokens.upsert_token_json(vendor_id, credentials.to_json())
-
-            if credentials.expired and credentials.refresh_token:
-                await asyncio.to_thread(credentials.refresh, GoogleRequest())
-                await self.tokens.upsert_token_json(vendor_id, credentials.to_json())
-            logger.info("google_oauth_callback_success | vendor_id=%s", vendor_id)
+            logger.info("google_sheets_oauth_callback_success | vendor_id=%s", vendor_id)
+        except ValidationError:
+            get_metrics_registry().increment("failures_total")
+            raise
         except Exception as exc:
             get_metrics_registry().increment("failures_total")
-            logger.error("google_oauth_callback_failed | vendor_id=%s | reason=%s", vendor_id, str(exc))
+            logger.error("google_sheets_oauth_callback_failed | vendor_id=%s | reason=%s", vendor_id, str(exc))
             raise ValidationError("Google OAuth callback failed", details={"reason": str(exc)}) from exc
 
         return vendor_id
@@ -140,9 +121,9 @@ class GoogleOAuthService:
             }
 
         try:
-            credentials = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+            credentials = Credentials.from_authorized_user_info(json.loads(token_json), SHEETS_SCOPES)
         except Exception as exc:
-            logger.error("google_oauth_status_invalid_token | vendor_id=%s | reason=%s", vendor_id, str(exc))
+            logger.error("google_sheets_oauth_status_invalid_token | vendor_id=%s | reason=%s", vendor_id, str(exc))
             return {
                 "vendor_id": vendor_id,
                 "has_credentials": True,
@@ -159,13 +140,14 @@ class GoogleOAuthService:
                 await self.tokens.upsert_token_json(vendor_id, credentials.to_json())
             except Exception as exc:
                 get_metrics_registry().increment("failures_total")
-                logger.error("google_oauth_refresh_failed | vendor_id=%s | reason=%s", vendor_id, str(exc))
+                logger.error("google_sheets_oauth_refresh_failed | vendor_id=%s | reason=%s", vendor_id, str(exc))
                 return {
                     "vendor_id": vendor_id,
                     "has_credentials": True,
                     "status": "refresh_failed",
                     "is_expired": True,
                     "has_refresh_token": True,
+                    "account_email": None,
                     "last_error": str(exc),
                 }
 
@@ -196,5 +178,5 @@ class GoogleOAuthService:
 
             return await asyncio.to_thread(_fetch)
         except Exception:
-            logger.debug("google_oauth_account_email_fetch_failed", exc_info=True)
+            logger.debug("google_sheets_account_email_fetch_failed", exc_info=True)
             return None

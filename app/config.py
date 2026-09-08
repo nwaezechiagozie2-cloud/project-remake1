@@ -73,10 +73,13 @@ class Settings(BaseSettings):
     google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
     google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
     google_redirect_uri: str = Field(default="http://localhost:8001/auth/google/callback", alias="GOOGLE_REDIRECT_URI")
+    google_sheets_redirect_uri: str = Field(default="http://localhost:8001/auth/google/sheets/callback", alias="GOOGLE_SHEETS_REDIRECT_URI")
     google_login_redirect_uri: str = Field(default="http://localhost:8001/auth/login/google/callback", alias="GOOGLE_LOGIN_REDIRECT_URI")
     google_customer_group_resource: str = Field(default="", alias="GOOGLE_CUSTOMER_GROUP_RESOURCE")
     frontend_base_url: str = Field(default="http://localhost:3000", alias="FRONTEND_BASE_URL")
     public_api_base_url: str = Field(default="http://localhost:8001", alias="PUBLIC_API_BASE_URL")
+    sheets_sweep_enabled: bool = Field(default=True, alias="SHEETS_SWEEP_ENABLED")
+    sheets_sweep_interval_seconds: int = Field(default=300, alias="SHEETS_SWEEP_INTERVAL_SECONDS")
 
 
 @lru_cache(maxsize=1)

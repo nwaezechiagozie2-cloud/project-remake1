@@ -8,7 +8,10 @@ from app.api.deps import (
     get_auth_service,
     get_business_info_repo,
     get_catalogue_repo,
+    get_google_sheets_oauth_service,
+    get_google_sheets_service,
     get_google_token_repo,
+    get_order_repo,
     get_product_repo,
     get_settings_repo,
     get_vendor_repo,
@@ -33,6 +36,8 @@ from app.schemas.api import (
     TelegramCredentialsRequest,
     TelegramCredentialsResponse,
     ProductUpdateRequest,
+    SheetsConfigResponse,
+    SheetsConfigUpdateRequest,
     VendorCatalogueResponse,
     VendorCatalogueUpdateRequest,
     VendorDashboardResponse,
@@ -187,6 +192,106 @@ async def get_bot_settings(vendor_id: int, vendors=Depends(get_vendor_repo), set
 async def upsert_bot_settings(vendor_id: int, payload: VendorSettingsUpdateRequest, vendors=Depends(get_vendor_repo), settings_repo=Depends(get_settings_repo)) -> dict:
     await _ensure_vendor(vendor_id, vendors)
     return await settings_repo.upsert(vendor_id, payload.model_dump(exclude_unset=True))
+
+
+@router.get("/{vendor_id}/sheets-config", dependencies=[Depends(_authorize_vendor_scope)], response_model=SheetsConfigResponse)
+async def get_sheets_config(
+    vendor_id: int,
+    vendors=Depends(get_vendor_repo),
+    settings_repo=Depends(get_settings_repo),
+    orders=Depends(get_order_repo),
+    sheets_oauth=Depends(get_google_sheets_oauth_service),
+) -> dict:
+    await _ensure_vendor(vendor_id, vendors)
+
+    oauth_status = await sheets_oauth.get_vendor_oauth_status(vendor_id)
+    google_connected = oauth_status.get("status") == "connected"
+
+    vendor_settings = await settings_repo.get(vendor_id)
+    pending = await orders.list_pending_for_vendor(vendor_id)
+    synced_orders = await orders.count_for_vendor(vendor_id, synced=True)
+
+    last_error = pending[0].get("sheets_last_error") if pending else None
+    if not google_connected:
+        sync_status = "not_connected"
+    elif last_error and "reauth" in (last_error or ""):
+        sync_status = "reauth_needed"
+    elif last_error and "spreadsheet_unavailable" in (last_error or ""):
+        sync_status = "spreadsheet_unavailable"
+    elif last_error:
+        sync_status = "error"
+    else:
+        sync_status = "healthy"
+
+    return {
+        "google_connected": google_connected,
+        "spreadsheet_id": vendor_settings.get("sheets_spreadsheet_id"),
+        "spreadsheet_title": vendor_settings.get("sheets_spreadsheet_title"),
+        "tab_name": vendor_settings.get("sheets_tab_name"),
+        "sync_enabled": bool(vendor_settings.get("sheets_sync_enabled")),
+        "sync_status": sync_status,
+        "pending_orders": len(pending),
+        "synced_orders": synced_orders,
+        "last_error": last_error,
+    }
+
+
+@router.put("/{vendor_id}/sheets-config", dependencies=[Depends(_authorize_vendor_scope)], response_model=SheetsConfigResponse)
+async def update_sheets_config(
+    vendor_id: int,
+    payload: SheetsConfigUpdateRequest,
+    vendors=Depends(get_vendor_repo),
+    settings_repo=Depends(get_settings_repo),
+    orders=Depends(get_order_repo),
+    sheets=Depends(get_google_sheets_service),
+    sheets_oauth=Depends(get_google_sheets_oauth_service),
+) -> dict:
+    await _ensure_vendor(vendor_id, vendors)
+
+    # Validate access via the Sheets API before persisting anything.
+    validation = await sheets.validate_spreadsheet(vendor_id, payload.spreadsheet_url)
+
+    await settings_repo.upsert(vendor_id, {
+        "sheets_spreadsheet_id": validation["spreadsheet_id"],
+        "sheets_spreadsheet_title": validation["spreadsheet_title"],
+        "sheets_tab_name": validation["tab_name"],
+        "sheets_sync_enabled": True,
+    })
+
+    return await get_sheets_config(
+        vendor_id, vendors=vendors, settings_repo=settings_repo, orders=orders, sheets_oauth=sheets_oauth
+    )
+
+
+@router.delete("/{vendor_id}/sheets-config", dependencies=[Depends(_authorize_vendor_scope)], response_model=SheetsConfigResponse)
+async def disconnect_sheets_config(
+    vendor_id: int,
+    vendors=Depends(get_vendor_repo),
+    settings_repo=Depends(get_settings_repo),
+    orders=Depends(get_order_repo),
+    sheets_oauth=Depends(get_google_sheets_oauth_service),
+) -> dict:
+    await _ensure_vendor(vendor_id, vendors)
+
+    await sheets_oauth.tokens.delete_for_vendor(vendor_id)
+    await settings_repo.upsert(vendor_id, {
+        "sheets_spreadsheet_id": None,
+        "sheets_spreadsheet_title": None,
+        "sheets_tab_name": None,
+        "sheets_sync_enabled": False,
+    })
+
+    return {
+        "google_connected": False,
+        "spreadsheet_id": None,
+        "spreadsheet_title": None,
+        "tab_name": None,
+        "sync_enabled": False,
+        "sync_status": "not_connected",
+        "pending_orders": await orders.count_for_vendor(vendor_id, synced=False),
+        "synced_orders": await orders.count_for_vendor(vendor_id, synced=True),
+        "last_error": None,
+    }
 
 
 @router.get("/{vendor_id}/catalogue", dependencies=[Depends(_authorize_vendor_scope)], response_model=VendorCatalogueResponse)

@@ -6,7 +6,9 @@ from app.repositories.sql import (
     SQLCatalogueRepository,
     SQLCustomerRepository,
     SQLEmailVerificationRepository,
+    SQLGoogleSheetsTokenRepository,
     SQLGoogleTokenRepository,
+    SQLOrderRepository,
     SQLProductRepository,
     SQLVendorRepository,
     SQLVendorSettingsRepository,
@@ -15,6 +17,8 @@ from app.services.agent_service import AgentService
 from app.services.auth_service import AuthService
 from app.services.google_contacts_service import GoogleContactsService
 from app.services.google_oauth_service import GoogleOAuthService
+from app.services.google_sheets_oauth_service import GoogleSheetsOAuthService
+from app.services.google_sheets_service import GoogleSheetsService
 from app.services.instagram_oauth_service import InstagramOAuthService
 from app.services.webhook_service import WebhookService
 from app.services.whatsapp_service import WhatsAppService
@@ -59,6 +63,16 @@ def get_google_token_repo() -> SQLGoogleTokenRepository:
 
 
 @lru_cache(maxsize=1)
+def get_google_sheets_token_repo() -> SQLGoogleSheetsTokenRepository:
+    return SQLGoogleSheetsTokenRepository()
+
+
+@lru_cache(maxsize=1)
+def get_order_repo() -> SQLOrderRepository:
+    return SQLOrderRepository()
+
+
+@lru_cache(maxsize=1)
 def get_email_verification_repo() -> SQLEmailVerificationRepository:
     return SQLEmailVerificationRepository()
 
@@ -87,6 +101,21 @@ def get_instagram_oauth_service() -> InstagramOAuthService:
     return InstagramOAuthService(settings=get_settings(), vendors=get_vendor_repo(), auth=get_auth_service())
 
 
+@lru_cache(maxsize=1)
+def get_google_sheets_oauth_service() -> GoogleSheetsOAuthService:
+    return GoogleSheetsOAuthService(settings=get_settings(), vendors=get_vendor_repo(), tokens=get_google_sheets_token_repo())
+
+
+@lru_cache(maxsize=1)
+def get_google_sheets_service() -> GoogleSheetsService:
+    return GoogleSheetsService(
+        settings=get_settings(),
+        tokens=get_google_sheets_token_repo(),
+        orders=get_order_repo(),
+        settings_repo=get_settings_repo(),
+    )
+
+
 def get_webhook_service() -> WebhookService:
     return WebhookService(
         vendors=get_vendor_repo(),
@@ -96,6 +125,8 @@ def get_webhook_service() -> WebhookService:
         whatsapp=WhatsAppService(get_settings()),
         instagram=InstagramService(get_settings()),
         telegram=TelegramService(get_settings()),
+        orders=get_order_repo(),
+        sheets=get_google_sheets_service(),
     )
 
 

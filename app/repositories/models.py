@@ -55,6 +55,10 @@ class VendorBotSetting(Base):
     confirm_before_sending_account_details: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     enable_knowledge_base_answers: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
     use_product_availability: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
+    sheets_sync_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    sheets_spreadsheet_id: Mapped[str | None] = mapped_column(String(100))
+    sheets_spreadsheet_title: Mapped[str | None] = mapped_column(String(255))
+    sheets_tab_name: Mapped[str | None] = mapped_column(String(255))
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
@@ -181,4 +185,38 @@ class VendorGoogleToken(Base):
 
     vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), primary_key=True)
     token_json: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class VendorGoogleSheetsToken(Base):
+    __tablename__ = "vendor_google_sheets_tokens"
+
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), primary_key=True)
+    token_json: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), index=True)
+    status: Mapped[str] = mapped_column(String(80), nullable=False, server_default=text("'ACCOUNT_DETAILS_SENT'"))
+    order_ref: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    # Denormalized customer snapshot so the row is self-contained for the sheet
+    customer_name: Mapped[str | None] = mapped_column(String(255))
+    customer_phone: Mapped[str | None] = mapped_column(String(50))
+    customer_platform: Mapped[str] = mapped_column(String(20), nullable=False)
+    customer_handle: Mapped[str | None] = mapped_column(String(100))
+    # AI-generated free-text order details (what the customer is buying)
+    order_details: Mapped[str | None] = mapped_column(Text)
+    # Sheets sync state
+    sheets_synced: Mapped[bool] = mapped_column(Boolean, server_default=text("0"), index=True)
+    sheets_sync_attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    sheets_synced_at: Mapped[datetime | None] = mapped_column(DateTime)
+    sheets_last_error: Mapped[str | None] = mapped_column(Text)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    sync_claimed_until: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -27,6 +27,19 @@ export type VendorBotSettings = {
   confirm_before_sending_account_details: boolean;
   enable_knowledge_base_answers: boolean;
   use_product_availability: boolean;
+  sheets_sync_enabled: boolean;
+};
+
+export type SheetsConfig = {
+  google_connected: boolean;
+  spreadsheet_id: string | null;
+  spreadsheet_title: string | null;
+  tab_name: string | null;
+  sync_enabled: boolean;
+  sync_status: "healthy" | "not_connected" | "reauth_needed" | "spreadsheet_unavailable" | "error";
+  pending_orders: number;
+  synced_orders: number;
+  last_error: string | null;
 };
 
 export type CatalogueUploadPayload = {
@@ -225,6 +238,33 @@ export const updateVendorBotSettings = async (
 export const fetchGoogleOAuthStatus = async (vendorId: string | number) => {
   const { data } = await apiClient.get("/auth/google/status", { params: { vendor_id: vendorId } });
   return data;
+};
+
+export const fetchGoogleSheetsOAuthStatus = async (vendorId: string | number) => {
+  const { data } = await apiClient.get("/auth/google/sheets/status", { params: { vendor_id: vendorId } });
+  return data;
+};
+
+export const fetchSheetsConfig = async (vendorId: string | number, token: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.get("/sheets-config");
+  return data as SheetsConfig;
+};
+
+export const updateSheetsConfig = async (
+  vendorId: string | number,
+  token: string,
+  payload: { spreadsheet_url: string },
+) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.put("/sheets-config", payload);
+  return data as SheetsConfig;
+};
+
+export const disconnectSheets = async (vendorId: string | number, token: string) => {
+  const client = getAuthClient(vendorId, token);
+  const { data } = await client.delete("/sheets-config");
+  return data as SheetsConfig;
 };
 
 export const disconnectGoogleContacts = async (vendorId: string | number, token: string) => {

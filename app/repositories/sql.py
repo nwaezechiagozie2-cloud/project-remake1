@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select, update
 
 from app.repositories.base import get_session
 from app.repositories.models import (
@@ -9,6 +9,7 @@ from app.repositories.models import (
     Customer,
     EmailVerificationToken,
     Message,
+    Order,
     OrderLifecycleState,
     Product,
     Vendor,
@@ -16,6 +17,7 @@ from app.repositories.models import (
     VendorBusinessInfo,
     VendorCatalogueUpload,
     VendorCustomer,
+    VendorGoogleSheetsToken,
     VendorGoogleToken,
 )
 
@@ -826,11 +828,19 @@ class SQLVendorSettingsRepository:
                     "confirm_before_sending_account_details": False,
                     "enable_knowledge_base_answers": True,
                     "use_product_availability": True,
+                    "sheets_sync_enabled": False,
+                    "sheets_spreadsheet_id": None,
+                    "sheets_spreadsheet_title": None,
+                    "sheets_tab_name": None,
                 }
             return {
                 "confirm_before_sending_account_details": bool(row.confirm_before_sending_account_details),
                 "enable_knowledge_base_answers": bool(row.enable_knowledge_base_answers),
                 "use_product_availability": bool(row.use_product_availability),
+                "sheets_sync_enabled": bool(row.sheets_sync_enabled),
+                "sheets_spreadsheet_id": row.sheets_spreadsheet_id,
+                "sheets_spreadsheet_title": row.sheets_spreadsheet_title,
+                "sheets_tab_name": row.sheets_tab_name,
             }
 
     async def upsert(self, vendor_id: int, payload: dict) -> dict:
@@ -847,6 +857,10 @@ class SQLVendorSettingsRepository:
                 "confirm_before_sending_account_details": bool(row.confirm_before_sending_account_details),
                 "enable_knowledge_base_answers": bool(row.enable_knowledge_base_answers),
                 "use_product_availability": bool(row.use_product_availability),
+                "sheets_sync_enabled": bool(row.sheets_sync_enabled),
+                "sheets_spreadsheet_id": row.sheets_spreadsheet_id,
+                "sheets_spreadsheet_title": row.sheets_spreadsheet_title,
+                "sheets_tab_name": row.sheets_tab_name,
             }
 
 
@@ -872,6 +886,147 @@ class SQLGoogleTokenRepository:
                 return False
             await session.delete(row)
             return True
+
+
+class SQLGoogleSheetsTokenRepository:
+    async def get_token_json(self, vendor_id: int) -> str | None:
+        async with get_session() as session:
+            row = await session.get(VendorGoogleSheetsToken, vendor_id)
+            return row.token_json if row else None
+
+    async def upsert_token_json(self, vendor_id: int, token_json: str) -> None:
+        async with get_session() as session:
+            row = await session.get(VendorGoogleSheetsToken, vendor_id)
+            if row:
+                row.token_json = token_json
+            else:
+                session.add(VendorGoogleSheetsToken(vendor_id=vendor_id, token_json=token_json))
+            await session.flush()
+
+    async def delete_for_vendor(self, vendor_id: int) -> bool:
+        async with get_session() as session:
+            row = await session.get(VendorGoogleSheetsToken, vendor_id)
+            if not row:
+                return False
+            await session.delete(row)
+            return True
+
+
+class SQLOrderRepository:
+    def _order_dict(self, row: Order) -> dict:
+        return {
+            "id": row.id,
+            "vendor_id": row.vendor_id,
+            "customer_id": row.customer_id,
+            "status": row.status,
+            "order_ref": row.order_ref,
+            "customer_name": row.customer_name,
+            "customer_phone": row.customer_phone,
+            "customer_platform": row.customer_platform,
+            "customer_handle": row.customer_handle,
+            "order_details": row.order_details,
+            "sheets_synced": bool(row.sheets_synced),
+            "sheets_sync_attempts": row.sheets_sync_attempts,
+            "sheets_synced_at": row.sheets_synced_at,
+            "sheets_last_error": row.sheets_last_error,
+            "next_attempt_at": row.next_attempt_at,
+            "created_at": row.created_at,
+        }
+
+    async def create_order(self, vendor_id: int, payload: dict) -> dict:
+        async with get_session() as session:
+            # vendor_id + customer_id uniqueness is enforced at the call site via the
+            # lifecycle-transition guard; here we just persist the snapshot.
+            row = Order(
+                vendor_id=vendor_id,
+                customer_id=payload.get("customer_id"),
+                status=payload.get("status") or "ACCOUNT_DETAILS_SENT",
+                order_ref="PENDING",  # placeholder; replaced with ORD-{id} below
+                customer_name=payload.get("customer_name"),
+                customer_phone=payload.get("customer_phone"),
+                customer_platform=payload.get("customer_platform") or "whatsapp",
+                customer_handle=payload.get("customer_handle"),
+                order_details=payload.get("order_details"),
+            )
+            session.add(row)
+            await session.flush()
+            row.order_ref = f"ORD-{row.id:06d}"
+            await session.flush()
+            await session.refresh(row)
+            return self._order_dict(row)
+
+    async def get_for_vendor(self, vendor_id: int, order_id: int) -> dict | None:
+        async with get_session() as session:
+            row = (await session.execute(
+                select(Order).where(Order.vendor_id == vendor_id, Order.id == order_id)
+            )).scalar_one_or_none()
+            return self._order_dict(row) if row else None
+
+    async def mark_synced(self, order_id: int) -> None:
+        async with get_session() as session:
+            row = await session.get(Order, order_id)
+            if not row:
+                return
+            row.sheets_synced = True
+            row.sheets_synced_at = datetime.utcnow()
+            row.sheets_last_error = None
+            row.next_attempt_at = None
+            await session.flush()
+
+    async def record_sync_failure(self, order_id: int, error: str, retry_delay_seconds: int) -> None:
+        async with get_session() as session:
+            row = await session.get(Order, order_id)
+            if not row:
+                return
+            row.sheets_sync_attempts += 1
+            row.sheets_last_error = error
+            row.next_attempt_at = datetime.utcnow() + timedelta(seconds=retry_delay_seconds)
+            await session.flush()
+
+    async def claim_pending(self, limit: int = 50) -> list[dict]:
+        """Optimistic-lock claim: rows claimed by one worker get a distinct claim
+        expiry, so two workers racing on the same row cannot both claim it."""
+        now = datetime.utcnow()
+        claim_expiry = now + timedelta(minutes=5)
+        async with get_session() as session:
+            await session.execute(
+                update(Order)
+                .where(
+                    Order.sheets_synced == False,  # noqa: E712
+                    or_(Order.next_attempt_at == None, Order.next_attempt_at <= now),  # noqa: E711
+                    or_(Order.sync_claimed_until == None, Order.sync_claimed_until <= now),  # noqa: E711
+                )
+                .values(sync_claimed_until=claim_expiry)
+                .execution_options(synchronize_session=False)
+            )
+            await session.flush()
+            rows = (await session.execute(
+                select(Order).where(
+                    Order.sheets_synced == False,  # noqa: E712
+                    Order.sync_claimed_until == claim_expiry,
+                ).order_by(Order.id).limit(limit)
+            )).scalars().all()
+            return [self._order_dict(row) for row in rows]
+
+    async def list_pending_for_vendor(self, vendor_id: int) -> list[dict]:
+        async with get_session() as session:
+            rows = (await session.execute(
+                select(Order).where(
+                    Order.vendor_id == vendor_id,
+                    Order.sheets_synced == False,  # noqa: E712
+                ).order_by(Order.id.desc())
+            )).scalars().all()
+            return [self._order_dict(row) for row in rows]
+
+    async def count_for_vendor(self, vendor_id: int, synced: bool) -> int:
+        async with get_session() as session:
+            result = await session.execute(
+                select(func.count()).select_from(Order).where(
+                    Order.vendor_id == vendor_id,
+                    Order.sheets_synced == synced,  # noqa: E712
+                )
+            )
+            return int(result.scalar() or 0)
 
 
 class SQLBusinessInfoRepository:

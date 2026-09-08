@@ -1,8 +1,9 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
 from app.domain.models import ParsedInboundMessage
-from app.domain.interfaces import AgentOrchestrator, ContactsAdapter, CustomerRepository, VendorRepository, WhatsAppAdapter, InstagramAdapter, TelegramAdapter
+from app.domain.interfaces import AgentOrchestrator, ContactsAdapter, CustomerRepository, OrderRepository, VendorRepository, WhatsAppAdapter, InstagramAdapter, TelegramAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,8 @@ class WebhookService:
         whatsapp: WhatsAppAdapter,
         instagram: InstagramAdapter | None = None,
         telegram: TelegramAdapter | None = None,
+        orders: OrderRepository | None = None,
+        sheets=None,
     ) -> None:
         self.vendors = vendors
         self.customers = customers
@@ -28,6 +31,8 @@ class WebhookService:
         self.whatsapp = whatsapp
         self.instagram = instagram
         self.telegram = telegram
+        self.orders = orders
+        self.sheets = sheets
 
     async def handle_payload(self, payload: dict) -> dict:
         obj_type = payload.get("object", "")
@@ -106,12 +111,44 @@ class WebhookService:
         decision = await self.agent.decide(vendor=vendor, message=message, is_vendor_sender=is_vendor_sender)
 
         if decision.order_status:
+            previous = await self.customers.get_order_lifecycle_state(
+                vendor_id=vendor["id"], customer_id=customer["id"]
+            )
+            previous_status = (previous or {}).get("status")
             await self.customers.upsert_order_lifecycle_state(
                 vendor_id=vendor["id"],
                 customer_id=customer["id"],
                 status=decision.order_status,
                 last_event_text=message.text,
             )
+
+            if (
+                decision.order_status == "ACCOUNT_DETAILS_SENT"
+                and previous_status != "ACCOUNT_DETAILS_SENT"
+                and self.orders
+            ):
+                order = await self.orders.create_order(
+                    vendor["id"],
+                    {
+                        "customer_id": customer["id"],
+                        "status": "ACCOUNT_DETAILS_SENT",
+                        "customer_name": customer.get("name") or message.profile_name,
+                        "customer_phone": customer.get("whatsapp_number"),
+                        "customer_platform": message.platform,
+                        "customer_handle": customer.get("instagram_id") or customer.get("telegram_id"),
+                        "order_details": decision.order_details or message.text,
+                    },
+                )
+                logger.info(
+                    "order_created | vendor_id=%s | order_ref=%s | platform=%s",
+                    vendor["id"], order.get("order_ref"), message.platform,
+                )
+                if self.sheets:
+                    task = asyncio.create_task(self.sheets.sync_order(order))
+                    task.add_done_callback(
+                        lambda t: logger.error("sheets sync task error: %s", t.exception())
+                        if t.exception() and not t.cancelled() else None
+                    )
 
         if decision.customer_text:
             customer_target = decision.customer_target_number or self._customer_reply_target(message)

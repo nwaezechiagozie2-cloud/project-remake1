@@ -80,11 +80,17 @@ def create_agent_tools(
 
 
 @tool
-def request_bank_details_and_vendor_approval():
+def request_bank_details_and_vendor_approval(order_description: str = "") -> str:
     """
     Call this tool ONLY when the customer explicitly asks for payment details,
     bank account numbers, or says 'I am ready to transfer/pay right now'.
     CRITICAL: Do not call this for 'I want to buy', 'I'm interested', or 'I'll take it'.
     Wait for the customer to ask for the payment step.
+
+    Args:
+        order_description: A one-sentence summary of what the customer is buying —
+            product names, quantity and price if known. Example:
+            "2x Ankara gown (large), NGN 45,000 total". Pass an empty string if unknown.
     """
-    return "SIGNAL:CHECKOUT_REQUESTED"
+    description = (order_description or "").strip().replace("|", " ")
+    return f"SIGNAL:CHECKOUT_REQUESTED|ORDER:{description}"

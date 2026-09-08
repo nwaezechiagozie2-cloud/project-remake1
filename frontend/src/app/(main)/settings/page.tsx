@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Shield,
   Check,
+  Table,
   UserPlus,
   Loader2,
   MessageCircle,
@@ -10,15 +11,20 @@ import {
 import {
   API_ROOT,
   disconnectGoogleContacts,
+  disconnectSheets,
   fetchGoogleOAuthStatus,
+  fetchGoogleSheetsOAuthStatus,
   fetchInstagramCredentials,
+  fetchSheetsConfig,
   fetchTelegramCredentials,
   fetchVendorBotSettings,
   fetchWhatsAppCredentials,
   getApiErrorMessage,
+  updateSheetsConfig,
   updateTelegramCredentials,
   updateVendorBotSettings,
   updateWhatsAppCredentials,
+  type SheetsConfig,
   type TelegramCredentials,
   type VendorBotSettings,
   type WhatsAppCredentials,
@@ -29,6 +35,7 @@ const defaultSettings: VendorBotSettings = {
   confirm_before_sending_account_details: false,
   enable_knowledge_base_answers: true,
   use_product_availability: true,
+  sheets_sync_enabled: false,
 };
 
 type SettingKey = keyof VendorBotSettings;
@@ -49,11 +56,18 @@ const settingRows: { key: SettingKey; label: string; desc: string }[] = [
     label: "Confirm Before Bank Details",
     desc: "Require your approval before payment details are sent. When off, the bot sends them automatically once a customer asks to pay.",
   },
+  {
+    key: "sheets_sync_enabled",
+    label: "Sync Orders to Google Sheets",
+    desc: "Every order is saved to your Google spreadsheet when payment details are sent to a customer. Orders are always stored in OmniClose too.",
+  },
 ];
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<VendorBotSettings>(defaultSettings);
   const [googleStatus, setGoogleStatus] = useState("not_connected");
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
+  const [sheetsGoogleEmail, setSheetsGoogleEmail] = useState<string | null>(null);
   const [instagramConnected, setInstagramConnected] = useState(false);
   const [whatsapp, setWhatsapp] = useState<WhatsAppCredentials | null>(null);
   const [whatsappNumber, setWhatsappNumber] = useState("");
@@ -62,6 +76,9 @@ export default function SettingsPage() {
   const [telegram, setTelegram] = useState<TelegramCredentials | null>(null);
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
+  const [sheets, setSheets] = useState<SheetsConfig | null>(null);
+  const [sheetsUrl, setSheetsUrl] = useState("");
+  const [savingSheets, setSavingSheets] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<SettingKey | null>(null);
   const [savingWhatsApp, setSavingWhatsApp] = useState(false);
@@ -76,17 +93,24 @@ export default function SettingsPage() {
         const token = localStorage.getItem("otc_token");
         if (!vendorId || !token) return;
 
-        const [botSettings, google, instagram, whatsappResult, telegramResult] = await Promise.allSettled([
+        const [botSettings, google, sheetsGoogle, instagram, whatsappResult, telegramResult, sheetsResult] = await Promise.allSettled([
           fetchVendorBotSettings(vendorId, token),
           fetchGoogleOAuthStatus(vendorId),
+          fetchGoogleSheetsOAuthStatus(vendorId),
           fetchInstagramCredentials(vendorId, token),
           fetchWhatsAppCredentials(vendorId, token),
           fetchTelegramCredentials(vendorId, token),
+          fetchSheetsConfig(vendorId, token),
         ]);
 
         if (botSettings.status === "fulfilled") setSettings(botSettings.value);
-        if (google.status === "fulfilled") setGoogleStatus(google.value.status);
+        if (google.status === "fulfilled") {
+          setGoogleStatus(google.value.status);
+          setGoogleEmail(google.value.account_email ?? null);
+        }
+        if (sheetsGoogle.status === "fulfilled") setSheetsGoogleEmail(sheetsGoogle.value.account_email ?? null);
         if (instagram.status === "fulfilled") setInstagramConnected(Boolean(instagram.value.connected));
+        if (sheetsResult.status === "fulfilled") setSheets(sheetsResult.value);
         if (whatsappResult.status === "fulfilled") {
           setWhatsapp(whatsappResult.value);
           setWhatsappNumber(whatsappResult.value.whatsapp_number || "");
@@ -119,6 +143,45 @@ export default function SettingsPage() {
       setGoogleStatus("not_connected");
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to disconnect Google Contacts"));
+    }
+  };
+
+  const handleSheetsConnect = () => {
+    const vendorId = localStorage.getItem("otc_vendor_id");
+    if (!vendorId) return;
+    window.location.href = `${API_ROOT}/auth/google/sheets?vendor_id=${vendorId}`;
+  };
+
+  const handleSheetsDisconnect = async () => {
+    const vendorId = localStorage.getItem("otc_vendor_id");
+    const token = localStorage.getItem("otc_token");
+    if (!vendorId || !token) return;
+    try {
+      const updated = await disconnectSheets(vendorId, token);
+      setSheets(updated);
+      setSheetsUrl("");
+      setSheetsGoogleEmail(null);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to disconnect Google Sheets"));
+    }
+  };
+
+  const handleSaveSheets = async () => {
+    const vendorId = localStorage.getItem("otc_vendor_id");
+    const token = localStorage.getItem("otc_token");
+    if (!vendorId || !token) return;
+    setSavingSheets(true);
+    setError("");
+    setSuccess("");
+    try {
+      const updated = await updateSheetsConfig(vendorId, token, { spreadsheet_url: sheetsUrl.trim() });
+      setSheets(updated);
+      setSheetsUrl("");
+      setSuccess(`Orders will sync to "${updated.spreadsheet_title}".`);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to save spreadsheet"));
+    } finally {
+      setSavingSheets(false);
     }
   };
 
@@ -383,6 +446,11 @@ export default function SettingsPage() {
                 <p className="text-[12px] text-gray-400 font-medium">
                   Status: <span className="text-gray-700">{googleStatus.replaceAll("_", " ")}</span>
                 </p>
+                {googleStatus === "connected" && googleEmail && (
+                  <p className="text-[12px] text-gray-400 font-medium">
+                    Connected as <span className="text-gray-600 font-bold">{googleEmail}</span>
+                  </p>
+                )}
               </div>
               {googleStatus === "connected" ? (
                 <button
@@ -400,6 +468,97 @@ export default function SettingsPage() {
                   <GoogleIcon />
                   Continue with Google
                 </button>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-6 pt-6 border-t border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <Table size={16} className="text-emerald-600" />
+              </div>
+              <h2 className="text-[14px] font-bold text-gray-900">Orders Spreadsheet</h2>
+            </div>
+
+            <div className="p-5 bg-gray-50/50 border border-gray-100 rounded-2xl space-y-4">
+              <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-1">
+                  <p className="text-[13px] font-bold text-gray-900">Google Account for Sheets</p>
+                  <p className="text-[12px] text-gray-400 font-medium">
+                    {sheets?.google_connected
+                      ? `Connected${sheets.spreadsheet_title ? ` — syncing to "${sheets.spreadsheet_title}"` : ""}`
+                      : "Connect the Google account that owns your orders spreadsheet."}
+                  </p>
+                  {sheets?.google_connected && sheetsGoogleEmail && (
+                    <p className="text-[12px] text-gray-400 font-medium">
+                      Connected as <span className="text-gray-600 font-bold">{sheetsGoogleEmail}</span>
+                    </p>
+                  )}
+                </div>
+                {sheets?.google_connected ? (
+                  <button
+                    onClick={handleSheetsDisconnect}
+                    className="w-full bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center justify-center gap-2 md:w-auto"
+                  >
+                    <GoogleIcon />
+                    Disconnect
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSheetsConnect}
+                    className="w-full bg-white border border-gray-100 text-[12px] font-bold text-gray-700 px-5 py-2 rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center justify-center gap-2 md:w-auto"
+                  >
+                    <GoogleIcon />
+                    Continue with Google
+                  </button>
+                )}
+              </div>
+
+              {sheets?.google_connected && (
+                <>
+                  <label className="space-y-1.5">
+                    <span className="block text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em]">Spreadsheet URL</span>
+                    <input
+                      value={sheetsUrl}
+                      onChange={event => setSheetsUrl(event.target.value)}
+                      placeholder={sheets.spreadsheet_id ? "Saved — paste a new URL to change the spreadsheet" : "https://docs.google.com/spreadsheets/d/..."}
+                      className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2.5 text-[13px] font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#3B5EE4]/30"
+                    />
+                  </label>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveSheets}
+                      disabled={savingSheets || !sheetsUrl.trim()}
+                      className="bg-[#3B5EE4] shadow-lg shadow-[#3B5EE4]/15 text-white text-[12px] font-bold px-5 py-2 rounded-xl hover:bg-[#2B4DD0] disabled:opacity-50 transition-colors flex items-center gap-2"
+                    >
+                      {savingSheets && <Loader2 size={14} className="animate-spin" />}
+                      Save Spreadsheet
+                    </button>
+                    <span className="text-[12px] text-gray-400 font-medium">
+                      Status: <span className={
+                        sheets.sync_status === "healthy"
+                          ? "text-emerald-600"
+                          : sheets.sync_status === "not_connected"
+                            ? "text-gray-500"
+                            : "text-amber-600"
+                      }>{sheets.sync_status.replaceAll("_", " ")}</span>
+                      {sheets.pending_orders > 0 && ` — ${sheets.pending_orders} pending, ${sheets.synced_orders} synced`}
+                    </span>
+                  </div>
+
+                  {sheets.sync_status === "reauth_needed" && (
+                    <p className="text-[12px] font-medium text-amber-600">
+                      Google needs you to reconnect — click Disconnect, then Continue with Google.
+                    </p>
+                  )}
+                  {sheets.sync_status === "spreadsheet_unavailable" && (
+                    <p className="text-[12px] font-medium text-amber-600">
+                      The spreadsheet can&apos;t be reached. Check that it still exists and is shared with your connected Google account.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </section>

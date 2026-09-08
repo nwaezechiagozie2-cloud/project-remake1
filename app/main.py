@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
+import asyncio
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,11 +20,34 @@ from app.observability import CorrelationIdMiddleware
 from app.repositories.base import init_db
 from app.security import ensure_jwt_secret_strength
 
+logger = logging.getLogger(__name__)
+
+
+async def _sheets_sweep_loop() -> None:
+    from app.api.deps import get_google_sheets_service
+
+    settings = get_settings()
+    interval = max(settings.sheets_sweep_interval_seconds, 10)
+    sheets = get_google_sheets_service()
+    while True:
+        try:
+            await sheets.sweep_pending()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("sheets_sweep_iteration_failed")
+        await asyncio.sleep(interval)
+
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI):
     await init_db()
+    sweep_task = None
+    if get_settings().sheets_sweep_enabled:
+        sweep_task = asyncio.create_task(_sheets_sweep_loop())
     yield
+    if sweep_task:
+        sweep_task.cancel()
 
 def ensure_required_env_vars(settings) -> None:
     if settings.app_env in ("production", "staging"):

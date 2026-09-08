@@ -104,6 +104,7 @@ class GoogleOAuthStatusResponse(BaseModel):
                 "status": "connected",
                 "is_expired": False,
                 "has_refresh_token": True,
+                "account_email": "vendor@gmail.com",
                 "last_error": None,
             }
         }
@@ -114,6 +115,7 @@ class GoogleOAuthStatusResponse(BaseModel):
     status: str
     is_expired: bool
     has_refresh_token: bool
+    account_email: str | None = None
     last_error: str | None = None
 
 
@@ -195,6 +197,7 @@ class VendorSettingsUpdateRequest(BaseModel):
                 "confirm_before_sending_account_details": True,
                 "enable_knowledge_base_answers": True,
                 "use_product_availability": True,
+                "sheets_sync_enabled": True,
             }
         }
     )
@@ -202,12 +205,54 @@ class VendorSettingsUpdateRequest(BaseModel):
     confirm_before_sending_account_details: bool | None = None
     enable_knowledge_base_answers: bool | None = None
     use_product_availability: bool | None = None
+    sheets_sync_enabled: bool | None = None
 
 
 class VendorSettingsResponse(BaseModel):
     confirm_before_sending_account_details: bool
     enable_knowledge_base_answers: bool
     use_product_availability: bool
+    sheets_sync_enabled: bool
+
+
+class SheetsConfigUpdateRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit",
+            }
+        }
+    )
+
+    spreadsheet_url: str = Field(min_length=10, max_length=500)
+
+
+class SheetsConfigResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "google_connected": True,
+                "spreadsheet_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+                "spreadsheet_title": "Orders — Demo Store",
+                "tab_name": "Sheet1",
+                "sync_enabled": True,
+                "sync_status": "healthy",
+                "pending_orders": 0,
+                "synced_orders": 12,
+                "last_error": None,
+            }
+        }
+    )
+
+    google_connected: bool
+    spreadsheet_id: str | None
+    spreadsheet_title: str | None
+    tab_name: str | None
+    sync_enabled: bool
+    sync_status: str
+    pending_orders: int
+    synced_orders: int
+    last_error: str | None
 
 
 class VendorCatalogueUpdateRequest(BaseModel):

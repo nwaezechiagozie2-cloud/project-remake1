@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 import logging
 
-from app.api.deps import get_auth_service, get_google_oauth_service, get_instagram_oauth_service, get_oauth_login_service
+from app.api.deps import get_auth_service, get_google_oauth_service, get_google_sheets_oauth_service, get_instagram_oauth_service, get_oauth_login_service
 from app.exceptions import ValidationError
 from app.observability import get_metrics_registry
 from app.schemas.api import (
@@ -17,6 +17,7 @@ from app.schemas.api import (
 from app.security import rate_limit_dependency
 from app.services.auth_service import AuthService
 from app.services.google_oauth_service import GoogleOAuthService
+from app.services.google_sheets_oauth_service import GoogleSheetsOAuthService
 from app.services.instagram_oauth_service import InstagramOAuthService
 from app.services.oauth_login_service import OAuthLoginService
 
@@ -139,6 +140,41 @@ async def auth_google_callback(
     logger.info("google_oauth_callback_completed | vendor_id=%s", vendor_id)
 
     return RedirectResponse(url=f"{oauth_service.settings.frontend_base_url.rstrip('/')}/settings?google=connected")
+
+
+@router.get("/auth/google/sheets", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
+async def auth_google_sheets(vendor_id: int, oauth_service: GoogleSheetsOAuthService = Depends(get_google_sheets_oauth_service)):
+    authorization_url = await oauth_service.build_authorization_url(vendor_id)
+    logger.info("google_sheets_oauth_authorization_redirect | vendor_id=%s", vendor_id)
+    return RedirectResponse(url=authorization_url)
+
+
+@router.get("/auth/google/sheets/status", response_model=GoogleOAuthStatusResponse, dependencies=[Depends(rate_limit_dependency(scope="auth"))])
+async def auth_google_sheets_status(vendor_id: int, oauth_service: GoogleSheetsOAuthService = Depends(get_google_sheets_oauth_service)) -> dict:
+    status_payload = await oauth_service.get_vendor_oauth_status(vendor_id)
+    logger.info("google_sheets_oauth_status_checked | vendor_id=%s | status=%s", vendor_id, status_payload.get("status"))
+    return status_payload
+
+
+@router.get("/auth/google/sheets/callback")
+async def auth_google_sheets_callback(
+    request: Request,
+    code: str | None = None,
+    state: str | None = None,
+    oauth_service: GoogleSheetsOAuthService = Depends(get_google_sheets_oauth_service),
+) -> RedirectResponse:
+    if not code or not state:
+        raise ValidationError("Missing OAuth callback parameters")
+
+    vendor_id = await oauth_service.complete_callback(
+        code=code,
+        state=state,
+        authorization_response=str(request.url),
+    )
+    get_metrics_registry().increment("oauth_callbacks_total")
+    logger.info("google_sheets_oauth_callback_completed | vendor_id=%s", vendor_id)
+
+    return RedirectResponse(url=f"{oauth_service.settings.frontend_base_url.rstrip('/')}/settings?sheets=connected")
 
 
 @router.get("/auth/instagram", dependencies=[Depends(rate_limit_dependency(scope="auth"))])
