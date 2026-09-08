@@ -104,6 +104,18 @@ export const apiClient = axios.create({
   },
 });
 
+let handled401 = false;
+
+const handle401 = () => {
+  if (handled401) return;
+  handled401 = true;
+  localStorage.removeItem("otc_token");
+  localStorage.removeItem("otc_vendor_id");
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    window.location.replace("/login");
+  }
+};
+
 export const getAuthClient = (vendorId: number | string, token: string) => {
   const client = axios.create({
     baseURL: `${VENDORS_ROOT}/${vendorId}`,
@@ -115,7 +127,12 @@ export const getAuthClient = (vendorId: number | string, token: string) => {
 
   client.interceptors.response.use(
     response => response,
-    (error: AxiosError) => Promise.reject(error),
+    (error: AxiosError) => {
+      if (error.response?.status === 401) {
+        handle401();
+      }
+      return Promise.reject(error);
+    },
   );
 
   return client;

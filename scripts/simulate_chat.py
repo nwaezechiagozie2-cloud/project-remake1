@@ -280,9 +280,6 @@ DEMO_VENDOR = {
     "bank_name": "GTBank",
     "account_name": "Demo Store Ltd",
     "account_number": "0123456789",
-    "product_catalogue_url": "https://example.com/demo-store-catalogue.jpg",
-    "product_catalogue_media_id": None,
-    "product_catalogue_caption": "Demo Store — Full Price List 2026",
 }
 
 CUSTOMER_NUMBER = "2348011111111"
@@ -346,15 +343,6 @@ def print_decision(decision: AgentDecision, label: str = ""):
 
     if decision.customer_target_number:
         print(f"  {C.CYAN}🎯 Target Customer: {decision.customer_target_number}{C.RESET}")
-
-    if decision.customer_media:
-        kind = decision.customer_media.get('kind', 'unknown')
-        caption = decision.customer_media.get('caption', '')
-        print(f"  {C.MAGENTA}📎 Media Attachment: [{kind}] {caption}{C.RESET}")
-        if decision.customer_media.get('image_url'):
-            print(f"     {C.DIM}URL: {decision.customer_media['image_url']}{C.RESET}")
-        if decision.customer_media.get('document_id'):
-            print(f"     {C.DIM}Media ID: {decision.customer_media['document_id']}{C.RESET}")
 
     print(f"  {C.YELLOW}📋 Order Status: {decision.order_status}{C.RESET}")
     print(f"{C.DIM}{'─' * 60}{C.RESET}\n")

@@ -146,9 +146,6 @@ async def fetch_vendor_dict(vendor_id: int) -> dict:
             "account_number": v.account_number,
             "account_name": v.account_name,
             "whatsapp_number": v.whatsapp_number,
-            "product_catalogue_url": None,
-            "product_catalogue_media_id": None,
-            "product_catalogue_caption": None,
         }
 
 

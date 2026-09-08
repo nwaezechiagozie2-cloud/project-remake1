@@ -4,7 +4,6 @@ Agent service — the bridge between the webhook and the AI agent.
 Customer messages → AI agent with tools (decides autonomously)
 Vendor button taps → Structured handler (system-level, not AI)
 """
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from app.config import Settings
 from app.domain.interfaces import BusinessInfoRepository, ProductRepository, VendorSettingsRepository, CustomerRepository
@@ -26,13 +25,6 @@ class AgentService:
         self._business_info = business_info
         self._customers = customers
         self._vendor_settings = vendor_settings
-        self._checkpointer = None
-
-    async def _get_checkpointer(self):
-        if self._checkpointer is None:
-            # Persistent sqlite checkpointer
-            self._checkpointer = SqliteSaver.from_conn_string("checkpoints.db")
-        return self._checkpointer
 
     async def decide(self, vendor: dict, message: ParsedInboundMessage, is_vendor_sender: bool) -> AgentDecision:
         text = message.text.strip()
@@ -106,7 +98,6 @@ class AgentService:
 
             decision = AgentDecision(
                 customer_text=result["response_text"],
-                customer_media=result["customer_media"],
                 order_status=result["order_status"],
             )
 

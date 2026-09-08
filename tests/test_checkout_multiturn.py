@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 from langchain_core.messages import HumanMessage, ToolMessage, AIMessage
 from app.agent.agent import run_customer_agent
 from app.domain.models import AgentDecision
@@ -13,6 +14,7 @@ class DummyAgent:
         self.current_turn += 1
         return turn_data
 
+@pytest.mark.asyncio
 async def test_checkout_multiturn():
     print("--- Running multi-turn checkout bug test ---")
 

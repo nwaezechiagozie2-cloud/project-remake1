@@ -1,3 +1,4 @@
+import logging
 import operator
 import re
 from typing import Annotated, Sequence, TypedDict
@@ -8,10 +9,11 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END, add_messages
 from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.sqlite import SqliteSaver
 
 from app.config import Settings
 from app.agent.tools import create_agent_tools
+
+logger = logging.getLogger(__name__)
 
 
 # 1. Define the Graph State
@@ -23,7 +25,7 @@ class AgentState(TypedDict):
 
 
 SYSTEM_PROMPT_BASE = (
-    "You are a helpful Sales Assistant, a production-grade autonomous agent for an o store. "
+    "You are a helpful Sales Assistant, a production-grade autonomous agent for an online store. "
     "Your goal is to be helpful, professional, and efficient. Write plain text (no markdown).\n\n"
     "Core Principles:\n"
     "- Ensure end-to-end usable and coherent interactions.\n"
@@ -92,22 +94,13 @@ def get_chat_providers(settings: Settings, tools: list = None):
 
 
 # 2. Define the Nodes
-def create_nodes():
+def create_nodes(tools: list):
     async def call_model(state: AgentState, config: RunnableConfig):
         """The AI reasoning node. Manual failover for production-grade resilience."""
         settings = config["configurable"].get("settings")
         if not settings:
             from app.config import get_settings
             settings = get_settings()
-
-        from app.agent.tools import create_agent_tools
-        tools = create_agent_tools(
-            products_repo=config["configurable"].get("products_repo"),
-            business_info_repo=config["configurable"].get("business_info_repo"),
-            vendor_id=config["configurable"].get("vendor_id"),
-            vendor_dict=config["configurable"].get("vendor_dict"),
-            vendor_settings=config["configurable"].get("vendor_settings"),
-        )
 
         providers = get_chat_providers(settings, tools=tools)
         if not providers:
@@ -132,20 +125,20 @@ def create_nodes():
             # Better provider identification
             p_name = "Gemini" if "Google" in str(model) else "NVIDIA/Llama"
             try:
-                print(f"Attempting {p_name}...")
+                logger.info("Attempting LLM provider: %s", p_name)
                 # 30 second timeout for production resilience during multi-step reasoning
                 response = await asyncio.wait_for(model.ainvoke(prompt), timeout=30.0)
-                
+
                 if response.tool_calls:
                     for tc in response.tool_calls:
-                        print(f"AI calling tool: {tc['name']}")
+                        logger.info("Agent calling tool: %s", tc['name'])
                 return {"messages": [response]}
             except asyncio.TimeoutError:
-                print(f"{p_name} timed out.")
+                logger.warning("LLM provider %s timed out.", p_name)
                 last_error = ValueError(f"{p_name} timed out.")
                 continue
             except Exception as e:
-                print(f"{p_name} Error: {e}")
+                logger.warning("LLM provider %s failed: %s", p_name, e)
                 last_error = e
                 continue
         
@@ -187,7 +180,7 @@ def create_customer_agent(
     
     # 2. Setup the graph
     workflow = StateGraph(AgentState)
-    call_model_node = create_nodes() # No longer takes model as argument
+    call_model_node = create_nodes(tools)
 
     workflow.add_node("agent", call_model_node)
     workflow.add_node("tools", ToolNode(tools))
@@ -241,7 +234,6 @@ async def run_customer_agent(
     if not customer_text.strip():
         customer_text = "I'm here — could you tell me a bit more about what you're looking for?"
 
-    customer_media = None
     new_order_status = final_state.get("order_status") or order_status or "INQUIRY"
     checkout_requested = False
 
@@ -256,10 +248,6 @@ async def run_customer_agent(
 
     for m in reversed(current_turn_messages):
         if m.type == "tool" and isinstance(m.content, str):
-            if "CATALOGUE_MEDIA|" in m.content and not customer_media:
-                parts = m.content.split("|")
-                if len(parts) >= 3:
-                    customer_media = {"kind": parts[1], "document_id": parts[2]}
             if "SIGNAL:CHECKOUT_REQUESTED" in m.content:
                 new_order_status = "WAITING_VENDOR_CHECKOUT_APPROVAL"
                 checkout_requested = True
@@ -267,7 +255,6 @@ async def run_customer_agent(
 
     return {
         "response_text": customer_text,
-        "customer_media": customer_media,
         "order_status": new_order_status,
         "checkout_requested": checkout_requested,
     }

@@ -24,8 +24,12 @@ export default function LoginPage() {
       if (!token || !vendor_id) {
         throw new Error("Login response did not include a token.");
       }
+      // Store directly — routing the token through the URL fragment would
+      // leave it in browser history.
+      localStorage.setItem("otc_token", token);
+      localStorage.setItem("otc_vendor_id", String(vendor_id));
       setStatus("Login successful. Opening dashboard...");
-      window.location.href = `${window.location.origin}/auth/complete#token=${encodeURIComponent(token)}&vendor_id=${encodeURIComponent(String(vendor_id))}`;
+      window.location.replace("/dashboard");
     } catch (err: unknown) {
       setError(`${getApiErrorMessage(err, "Login failed")} API: ${API_ROOT}/auth/login`);
     } finally {
